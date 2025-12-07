@@ -87,7 +87,7 @@ PORT=8000
 . venv/bin/activate
 
 # Start the server
-python server/main.py
+python -m server.main
 ```
 
 The server will start on `http://127.0.0.1:8000`
@@ -232,7 +232,7 @@ Each conversation maintains:
 ```bash
 # Terminal 1: Start server
 . venv/bin/activate
-python server/main.py
+python -m server.main
 
 # Terminal 2 (optional): Start ngrok
 ngrok http 8000

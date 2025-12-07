@@ -39,7 +39,7 @@ CLAUDE_PROJECT_PATH=/path/to/your/project
 ## Step 3: Start Server (30 seconds)
 
 ```bash
-python server/main.py
+python -m server.main
 ```
 
 You should see:
