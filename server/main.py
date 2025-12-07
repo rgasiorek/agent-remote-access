@@ -99,7 +99,8 @@ async def chat(request: ChatRequest, username: str = Depends(verify_auth)):
             session_manager.update_session(
                 conv_id=conv_id,
                 session_id=result.session_id,
-                turn_count=result.turns
+                turn_count=result.turns,
+                last_message=request.message
             )
 
         return ChatResponse(

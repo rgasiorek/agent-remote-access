@@ -4,33 +4,81 @@ A system for remotely accessing Claude Code CLI sessions from mobile devices via
 
 ## Overview
 
-This project creates a bridge between your mobile device and local Claude Code CLI sessions running on your laptop. It exposes a web-based chat interface that forwards messages to Claude Code using its headless mode (`claude -p`), maintaining conversation continuity through session management.
+This project creates a **remote access bridge** to interact with Claude Code CLI sessions from your mobile device. It's built with FastAPI and provides:
+
+1. **Web-based chat interface** - Mobile-friendly UI served by FastAPI
+2. **HTTP API endpoints** - RESTful API for sending messages to Claude Code
+3. **Session management** - Tracks multiple conversations with context persistence
+4. **Secure tunnel** - Ngrok exposes local server to internet via HTTPS
 
 ## Architecture
 
 ```
-Mobile Browser (HTTPS)
-    ↓
-Ngrok Tunnel (HTTPS)
-    ↓
-FastAPI Server (Python)
-    ├─ HTTP Basic Auth
-    ├─ Session Manager
-    └─ Claude CLI Wrapper
-        ↓
-    claude -p --resume <session-id>
-        ↓
-    Local Project Context
+┌─────────────────────────────────────────────────────────────────────┐
+│ MOBILE DEVICE                                                       │
+│                                                                     │
+│  Browser → Chat UI (HTML/JS/CSS)                                   │
+│            ↓                                                        │
+│  HTTPS Requests to API:                                            │
+│    • POST /api/chat {"message": "...", "conv_id": "default"}       │
+│    • GET  /api/sessions (list all conversations)                   │
+│    • POST /api/reset (start new conversation)                      │
+└─────────────────────────────────────────────────────────────────────┘
+                             ↓
+                    HTTPS (Encrypted)
+                             ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ NGROK TUNNEL (https://abc123.ngrok.io)                             │
+│  • Provides public HTTPS URL                                        │
+│  • Handles SSL/TLS termination                                      │
+│  • Forwards to localhost:8000                                       │
+└─────────────────────────────────────────────────────────────────────┘
+                             ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ YOUR LAPTOP (localhost:8000)                                        │
+│                                                                     │
+│ ┌─────────────────────────────────────────────────────────────┐   │
+│ │ FASTAPI SERVER (Python)                                       │   │
+│ │                                                               │   │
+│ │  1. Serves Frontend (/, /app.js, /styles.css)                │   │
+│ │  2. API Endpoints (/api/*)                                    │   │
+│ │  3. HTTP Basic Auth Middleware                                │   │
+│ │  4. Session Manager (tracks conversation IDs → session UUIDs) │   │
+│ │  5. Claude CLI Wrapper (subprocess executor)                  │   │
+│ └─────────────────────────────────────────────────────────────┘   │
+│                             ↓                                       │
+│              Spawns subprocess for each request:                    │
+│              `claude -p "message" --resume <UUID> --output-format json` │
+│                             ↓                                       │
+│ ┌─────────────────────────────────────────────────────────────┐   │
+│ │ CLAUDE CODE CLI (Headless Mode)                              │   │
+│ │  • Executes in project directory (CLAUDE_PROJECT_PATH)        │   │
+│ │  • Has access to local files, git, tools                      │   │
+│ │  • Returns JSON response with result + session UUID           │   │
+│ │  • Session stored in ~/.claude/ for continuity                │   │
+│ └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
+
+### Key Points:
+
+- **FastAPI** serves BOTH the frontend UI AND the HTTP API endpoints
+- Each API request spawns a `claude -p` subprocess (headless mode)
+- The FastAPI server acts as a **stateless proxy** - it doesn't maintain conversation context
+- **Claude Code itself** maintains conversation context via session UUIDs (stored in `~/.claude/`)
+- The **session manager** just tracks which UUID belongs to which conversation ID
+- Multiple conversations can run simultaneously (each gets its own UUID)
 
 ## Features
 
 - **Remote Access**: Chat with Claude Code from any mobile browser
-- **Session Persistence**: Conversations maintain context across requests
+- **Multiple Sessions**: Dropdown to select and switch between conversations
+- **Session Persistence**: Each conversation maintains full context across requests
+- **Last Message Preview**: See the last message from each conversation
 - **Secure Access**: HTTP Basic Authentication + HTTPS via ngrok
-- **Simple UI**: Mobile-responsive chat interface
-- **Session Management**: Track multiple conversations with session IDs
-- **Cost Tracking**: Monitor API usage and conversation turns
+- **Mobile-Responsive UI**: Clean chat interface optimized for mobile devices
+- **Cost Tracking**: Monitor API usage and conversation turns per session
+- **Auto-Approved Permissions**: Pre-configured to allow file editing and git operations
 
 ## Prerequisites
 

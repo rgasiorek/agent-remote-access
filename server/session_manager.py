@@ -50,7 +50,7 @@ class SessionManager:
         conv = data.get("conversations", {}).get(conv_id)
         return conv.get("session_id") if conv else None
 
-    def update_session(self, conv_id: str = "default", session_id: str = None, turn_count: int = 0):
+    def update_session(self, conv_id: str = "default", session_id: str = None, turn_count: int = 0, last_message: str = None):
         """
         Update or create session information
 
@@ -58,6 +58,7 @@ class SessionManager:
             conv_id: Conversation identifier
             session_id: Claude session UUID
             turn_count: Number of turns in conversation
+            last_message: Last user message (for preview)
         """
         data = self._read_sessions()
 
@@ -66,12 +67,15 @@ class SessionManager:
                 "session_id": session_id,
                 "created_at": datetime.utcnow().isoformat() + "Z",
                 "last_message_at": datetime.utcnow().isoformat() + "Z",
-                "turn_count": turn_count
+                "turn_count": turn_count,
+                "last_message": last_message[:100] if last_message else ""
             }
         else:
             data["conversations"][conv_id]["session_id"] = session_id
             data["conversations"][conv_id]["last_message_at"] = datetime.utcnow().isoformat() + "Z"
             data["conversations"][conv_id]["turn_count"] = turn_count
+            if last_message:
+                data["conversations"][conv_id]["last_message"] = last_message[:100]
 
         self._write_sessions(data)
 

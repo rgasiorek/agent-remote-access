@@ -10,16 +10,19 @@ const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const resetBtn = document.getElementById('reset-btn');
 const sessionInfo = document.getElementById('session-info');
+const sessionSelect = document.getElementById('session-select');
 const turnCountEl = document.getElementById('turn-count');
 const totalCostEl = document.getElementById('total-cost');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     updateSessionInfo();
+    loadSessions();
 
     // Event listeners
     sendBtn.addEventListener('click', sendMessage);
     resetBtn.addEventListener('click', resetConversation);
+    sessionSelect.addEventListener('change', switchSession);
 
     // Send on Enter (Shift+Enter for new line)
     messageInput.addEventListener('keydown', (e) => {
@@ -236,4 +239,73 @@ function addMessageWithoutSave(role, content) {
     messageDiv.appendChild(roleLabel);
     messageDiv.appendChild(contentDiv);
     chatContainer.appendChild(messageDiv);
+}
+
+async function loadSessions() {
+    try {
+        const response = await fetch('/api/sessions');
+
+        if (!response.ok) {
+            console.error('Failed to load sessions');
+            return;
+        }
+
+        const sessions = await response.json();
+
+        // Clear existing options except "New Session"
+        sessionSelect.innerHTML = '<option value="">New Session</option>';
+
+        // Add session options
+        Object.entries(sessions).forEach(([convId, session]) => {
+            const option = document.createElement('option');
+            option.value = convId;
+
+            const lastMsg = session.last_message || 'No messages';
+            const preview = lastMsg.length > 40 ? lastMsg.substring(0, 40) + '...' : lastMsg;
+            const turns = session.turn_count || 0;
+
+            option.textContent = `${convId} (${turns} turns) - ${preview}`;
+            option.title = `Last message: ${lastMsg}\nTurns: ${turns}\nLast active: ${session.last_message_at}`;
+
+            // Select current conversation
+            if (convId === conversationId) {
+                option.selected = true;
+            }
+
+            sessionSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading sessions:', error);
+    }
+}
+
+function switchSession() {
+    const selectedConvId = sessionSelect.value;
+
+    if (!selectedConvId) {
+        // New session
+        resetConversation();
+        return;
+    }
+
+    // Switch to selected conversation
+    conversationId = selectedConvId;
+    localStorage.setItem('claude_conv_id', conversationId);
+
+    // Clear current chat
+    chatContainer.innerHTML = `
+        <div class="welcome-message">
+            <h2>Switched to: ${conversationId}</h2>
+            <p>Send a message to continue this conversation.</p>
+        </div>
+    `;
+    localStorage.removeItem('chat_history');
+
+    // Note: We don't have the session_id for this conversation yet
+    // It will be loaded when we send the first message
+    sessionId = null;
+    localStorage.removeItem('claude_session_id');
+
+    updateStats();
+    updateSessionInfo();
 }
