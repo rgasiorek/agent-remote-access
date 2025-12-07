@@ -57,7 +57,31 @@ python3 -m venv venv
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+### 2. Install ngrok
+
+```bash
+# macOS (with Homebrew)
+brew install ngrok
+
+# Or download directly for macOS (ARM64)
+curl -Lo ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-arm64.zip
+unzip ngrok.zip
+chmod +x ngrok
+
+# For other platforms, visit: https://ngrok.com/download
+```
+
+**Setup ngrok authentication:**
+
+1. Sign up for free at https://dashboard.ngrok.com/signup
+2. Get your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken
+3. Configure ngrok:
+
+```bash
+ngrok config add-authtoken YOUR_AUTHTOKEN
+```
+
+### 3. Configure Environment
 
 ```bash
 # Copy environment template

@@ -19,7 +19,28 @@ python3 -m venv venv
 pip install -r requirements.txt
 ```
 
-## Step 2: Configure (1 minute)
+## Step 2: Install ngrok (2 minutes)
+
+```bash
+# macOS users
+brew install ngrok
+
+# Or download directly
+curl -Lo ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-arm64.zip
+unzip ngrok.zip
+chmod +x ngrok
+```
+
+**Setup ngrok:**
+1. Sign up: https://dashboard.ngrok.com/signup
+2. Get authtoken: https://dashboard.ngrok.com/get-started/your-authtoken
+3. Configure:
+
+```bash
+ngrok config add-authtoken YOUR_AUTHTOKEN
+```
+
+## Step 3: Configure (1 minute)
 
 ```bash
 # Create .env file
@@ -36,7 +57,7 @@ AUTH_PASSWORD=yourpassword
 CLAUDE_PROJECT_PATH=/path/to/your/project
 ```
 
-## Step 3: Start Server (30 seconds)
+## Step 4: Start Server (30 seconds)
 
 ```bash
 python -m server.main
@@ -49,14 +70,14 @@ Project path: /path/to/your/project
 Server URL: http://127.0.0.1:8000
 ```
 
-## Step 4: Test Locally (1 minute)
+## Step 5: Test Locally (1 minute)
 
 Open browser: `http://localhost:8000`
 - Enter your credentials when prompted
 - Type a message and send
 - You should get a response from Claude!
 
-## Step 5: Expose via Ngrok (1 minute)
+## Step 6: Expose via Ngrok (1 minute)
 
 In a NEW terminal:
 
@@ -66,7 +87,7 @@ ngrok http 8000
 
 Copy the HTTPS URL (e.g., `https://abc123.ngrok.io`)
 
-## Step 6: Access from Mobile (30 seconds)
+## Step 7: Access from Mobile (30 seconds)
 
 - Open the ngrok URL on your phone
 - Enter credentials
