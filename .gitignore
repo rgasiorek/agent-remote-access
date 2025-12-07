@@ -12,6 +12,12 @@ __pycache__/
 # Session data
 sessions/sessions.json
 
+# Ngrok
+ngrok
+ngrok.zip
+ngrok.exe
+ngrok_*
+
 # IDE
 .vscode/
 .idea/
