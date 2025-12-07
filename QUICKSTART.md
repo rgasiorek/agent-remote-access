@@ -5,9 +5,17 @@ Get up and running with Claude Code Remote Access in 5 minutes.
 ## Step 1: Install Dependencies (1 minute)
 
 ```bash
-cd /Users/montrosesoftware/Workspace/agent-remote-access
+# Clone and navigate to directory
+git clone https://github.com/rgasiorek/agent-remote-access.git
+cd agent-remote-access
+
+# Create virtual environment
 python3 -m venv venv
-source venv/bin/activate
+
+# Activate virtual environment
+. venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 

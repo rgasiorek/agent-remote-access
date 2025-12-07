@@ -43,11 +43,15 @@ FastAPI Server (Python)
 ### 1. Clone and Setup
 
 ```bash
-cd /Users/montrosesoftware/Workspace/agent-remote-access
+# Clone the repository
+git clone https://github.com/rgasiorek/agent-remote-access.git
+cd agent-remote-access
 
 # Create virtual environment
 python3 -m venv venv
-source venv/bin/activate
+
+# Activate virtual environment
+. venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -80,7 +84,7 @@ PORT=8000
 
 ```bash
 # Activate virtual environment (if not already active)
-source venv/bin/activate
+. venv/bin/activate
 
 # Start the server
 python server/main.py
@@ -227,7 +231,7 @@ Each conversation maintains:
 
 ```bash
 # Terminal 1: Start server
-source venv/bin/activate
+. venv/bin/activate
 python server/main.py
 
 # Terminal 2 (optional): Start ngrok
