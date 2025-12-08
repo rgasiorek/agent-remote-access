@@ -400,6 +400,83 @@ curl -u username:password http://localhost:8000/api/sessions
 cat sessions/sessions.json
 ```
 
+## Troubleshooting
+
+### Cloudflare Tunnel Connection Issues
+
+If you see "control stream encountered a failure" errors:
+
+1. **Verify FastAPI server is running:**
+   ```bash
+   curl http://localhost:8000/health
+   # Should return: {"status":"healthy","service":"claude-remote-access"}
+   ```
+
+2. **Check cloudflared is using correct config:**
+   ```bash
+   # When using Terraform-generated config, run:
+   cloudflared tunnel --config .cloudflared/config.yml run agent-remote-access
+   ```
+
+3. **Validate ingress configuration:**
+   ```bash
+   cloudflared tunnel --config .cloudflared/config.yml ingress validate
+   # Should output: OK
+   ```
+
+4. **Check tunnel status:**
+   ```bash
+   # View tunnel info (requires API token in env)
+   export CLOUDFLARE_API_TOKEN=your_token
+   cloudflared tunnel info agent-remote-access
+   ```
+
+5. **Verify credentials file exists:**
+   ```bash
+   ls -la .cloudflared/*.json
+   # Should show the tunnel credentials file
+   ```
+
+6. **Test local connectivity:**
+   ```bash
+   # Ensure no firewall blocking localhost:8000
+   telnet localhost 8000
+   # Or:
+   nc -zv localhost 8000
+   ```
+
+7. **Check for port conflicts:**
+   ```bash
+   lsof -i :8000
+   # Should only show your python process
+   ```
+
+### Common Issues
+
+**"Cannot determine default origin certificate path"**
+- Solution: Always specify `--config` flag with full path to config.yml
+- Example: `cloudflared tunnel --config /full/path/to/.cloudflared/config.yml run agent-remote-access`
+
+**"Tunnel not found" or "404" on URL**
+- Ensure tunnel is running (`ps aux | grep cloudflared`)
+- Verify you're using the correct tunnel URL from Terraform output
+- Check tunnel exists: `cloudflared tunnel list`
+
+**"Authentication error (10000)"**
+- Your Cloudflare API token needs **Cloudflare Tunnel** permissions
+- Regenerate token at: https://dash.cloudflare.com/profile/api-tokens
+- Update `terraform/terraform.tfvars` with new token
+
+**Remote Claude can't edit files**
+- Add permissions to `.claude/settings.local.json` (see QUICKSTART.md)
+- Start a new Claude session after updating permissions
+- Old sessions don't pick up new permission settings
+
+**Session dropdown empty**
+- Sessions are created after first message
+- Check `sessions/sessions.json` exists and is valid JSON
+- Restart FastAPI server if file was manually edited
+
 ## Future Enhancements
 
 - [ ] JWT authentication
