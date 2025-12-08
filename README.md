@@ -9,7 +9,7 @@ This project creates a **remote access bridge** to interact with Claude Code CLI
 1. **Web-based chat interface** - Mobile-friendly UI served by FastAPI
 2. **HTTP API endpoints** - RESTful API for sending messages to Claude Code
 3. **Session management** - Tracks multiple conversations with context persistence
-4. **Secure tunnel** - Ngrok exposes local server to internet via HTTPS
+4. **Secure tunnel** - Cloudflare Tunnel exposes local server to internet via HTTPS
 
 ## Architecture
 
@@ -28,9 +28,10 @@ This project creates a **remote access bridge** to interact with Claude Code CLI
                     HTTPS (Encrypted)
                              ↓
 ┌─────────────────────────────────────────────────────────────────────┐
-│ NGROK TUNNEL (https://abc123.ngrok.io)                             │
-│  • Provides public HTTPS URL                                        │
+│ CLOUDFLARE TUNNEL (https://remote-agent.yourdomain.com)            │
+│  • Provides persistent HTTPS URL on your domain                     │
 │  • Handles SSL/TLS termination                                      │
+│  • Global CDN network for low latency                               │
 │  • Forwards to localhost:8000                                       │
 └─────────────────────────────────────────────────────────────────────┘
                              ↓
@@ -75,7 +76,7 @@ This project creates a **remote access bridge** to interact with Claude Code CLI
 - **Multiple Sessions**: Dropdown to select and switch between conversations
 - **Session Persistence**: Each conversation maintains full context across requests
 - **Last Message Preview**: See the last message from each conversation
-- **Secure Access**: HTTP Basic Authentication + HTTPS via ngrok
+- **Secure Access**: HTTP Basic Authentication + HTTPS via Cloudflare Tunnel
 - **Mobile-Responsive UI**: Clean chat interface optimized for mobile devices
 - **Cost Tracking**: Monitor API usage and conversation turns per session
 - **Auto-Approved Permissions**: Pre-configured to allow file editing and git operations
@@ -84,7 +85,8 @@ This project creates a **remote access bridge** to interact with Claude Code CLI
 
 - Python 3.8 or higher
 - Claude Code CLI installed and authenticated
-- ngrok account (free tier works fine)
+- Cloudflare account (free tier works great)
+- A domain managed by Cloudflare (or use Cloudflare's free subdomain)
 
 ## Installation
 
@@ -105,28 +107,49 @@ python3 -m venv venv
 pip install -r requirements.txt
 ```
 
-### 2. Install ngrok
+### 2. Install Cloudflare Tunnel
 
 ```bash
 # macOS (with Homebrew)
-brew install ngrok
+brew install cloudflared
 
 # Or download directly for macOS (ARM64)
-curl -Lo ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-arm64.zip
-unzip ngrok.zip
-chmod +x ngrok
+curl -Lo cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64
+chmod +x cloudflared
+sudo mv cloudflared /usr/local/bin/
 
-# For other platforms, visit: https://ngrok.com/download
+# For other platforms, visit: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
 ```
 
-**Setup ngrok authentication:**
+**Setup Cloudflare Tunnel:**
 
-1. Sign up for free at https://dashboard.ngrok.com/signup
-2. Get your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken
-3. Configure ngrok:
+1. Sign up for free at https://dash.cloudflare.com/sign-up
+2. Authenticate cloudflared:
 
 ```bash
-ngrok config add-authtoken YOUR_AUTHTOKEN
+cloudflared tunnel login
+```
+
+This opens a browser window to authorize. Once authorized, create your tunnel:
+
+```bash
+# Create tunnel
+cloudflared tunnel create agent-remote-access
+
+# This creates a credentials file at ~/.cloudflared/<TUNNEL-ID>.json
+# Note the Tunnel ID from the output
+```
+
+3. Create a DNS record (replace with your domain):
+
+```bash
+# Route your domain to the tunnel
+cloudflared tunnel route dns agent-remote-access remote-agent.yourdomain.com
+```
+
+Or use Cloudflare's free subdomain:
+```bash
+cloudflared tunnel route dns agent-remote-access <TUNNEL-ID>.cfargotunnel.com
 ```
 
 ### 3. Configure Environment
@@ -164,21 +187,59 @@ python -m server.main
 
 The server will start on `http://127.0.0.1:8000`
 
-### Exposing via Ngrok
+### Exposing via Cloudflare Tunnel
 
 In a new terminal:
 
 ```bash
-ngrok http 8000
+# Run the tunnel (replace with your tunnel name)
+cloudflared tunnel run agent-remote-access --url http://localhost:8000
 ```
 
-Ngrok will provide an HTTPS URL like: `https://abc123.ngrok.io`
+Or use a config file for persistence. Create `~/.cloudflared/config.yml`:
+
+```yaml
+tunnel: agent-remote-access
+credentials-file: /Users/yourname/.cloudflared/<TUNNEL-ID>.json
+
+ingress:
+  - hostname: remote-agent.yourdomain.com
+    service: http://localhost:8000
+  - service: http_status:404
+```
+
+Then simply run:
+```bash
+cloudflared tunnel run
+```
+
+Your tunnel will be available at: `https://remote-agent.yourdomain.com`
 
 ### Accessing from Mobile
 
-1. Open the ngrok HTTPS URL in your mobile browser
+1. Open your Cloudflare Tunnel URL in your mobile browser (e.g., `https://remote-agent.yourdomain.com`)
 2. Enter your HTTP Basic Auth credentials (from `.env`)
-3. Start chatting with Claude Code!
+3. Select a session from the dropdown or start a new one
+4. Start chatting with Claude Code!
+
+## Alternative: Terraform Automation
+
+For automated Cloudflare Tunnel setup, use the included Terraform configuration:
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your Cloudflare credentials
+terraform init
+terraform apply
+```
+
+This automatically creates:
+- Cloudflare Tunnel
+- DNS record
+- Local credentials and config files
+
+See [`terraform/README.md`](terraform/README.md) for detailed instructions.
 
 ## Project Structure
 
@@ -196,6 +257,11 @@ agent-remote-access/
 │   └── styles.css          # Styling
 ├── sessions/
 │   └── sessions.json        # Session storage (auto-created)
+├── terraform/               # Cloudflare Tunnel IaC
+│   ├── cloudflare.tf        # Main Terraform config
+│   ├── variables.tf         # Input variables
+│   ├── outputs.tf           # Output values
+│   └── README.md           # Terraform documentation
 ├── requirements.txt         # Python dependencies
 ├── .env.example            # Environment template
 ├── .env                    # Your credentials (gitignored)

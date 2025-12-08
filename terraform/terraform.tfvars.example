@@ -1,0 +1,7 @@
+# Copy this file to terraform.tfvars and fill in your values
+
+cloudflare_api_token  = "your-cloudflare-api-token-here"
+cloudflare_account_id = "your-account-id-here"
+cloudflare_zone_id    = "your-zone-id-here"
+tunnel_hostname       = "remote-agent.yourdomain.com"
+tunnel_subdomain      = "remote-agent"
