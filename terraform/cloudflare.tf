@@ -34,20 +34,25 @@ resource "cloudflare_tunnel_config" "agent_remote_access" {
   tunnel_id  = cloudflare_tunnel.agent_remote_access.id
 
   config {
-    ingress_rule {
-      hostname = var.tunnel_hostname
-      service  = "http://localhost:8000"
+    # Only add hostname rule if custom domain is configured
+    dynamic "ingress_rule" {
+      for_each = var.tunnel_hostname != "" ? [1] : []
+      content {
+        hostname = var.tunnel_hostname
+        service  = "http://localhost:8000"
+      }
     }
 
-    # Catch-all rule (required)
+    # Catch-all rule (required) - routes all traffic if no custom domain
     ingress_rule {
-      service = "http_status:404"
+      service = "http://localhost:8000"
     }
   }
 }
 
-# Create DNS record pointing to the tunnel
+# Create DNS record pointing to the tunnel (only if zone_id is provided)
 resource "cloudflare_record" "agent_remote_access" {
+  count   = var.cloudflare_zone_id != "" ? 1 : 0
   zone_id = var.cloudflare_zone_id
   name    = var.tunnel_subdomain
   value   = "${cloudflare_tunnel.agent_remote_access.id}.cfargotunnel.com"

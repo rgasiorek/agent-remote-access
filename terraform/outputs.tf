@@ -10,7 +10,7 @@ output "tunnel_cname" {
 
 output "tunnel_url" {
   description = "Full HTTPS URL to access the tunnel"
-  value       = "https://${var.tunnel_hostname}"
+  value       = var.tunnel_hostname != "" ? "https://${var.tunnel_hostname}" : "https://${cloudflare_tunnel.agent_remote_access.id}.cfargotunnel.com"
 }
 
 output "cloudflared_command" {
