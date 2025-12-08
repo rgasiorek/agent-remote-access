@@ -15,17 +15,16 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-# Generate random secret for tunnel
-resource "random_password" "tunnel_secret" {
-  length  = 64
-  special = false
+# Generate random secret for tunnel (32 bytes)
+resource "random_bytes" "tunnel_secret" {
+  length = 32
 }
 
 # Create Cloudflare Tunnel
 resource "cloudflare_tunnel" "agent_remote_access" {
   account_id = var.cloudflare_account_id
   name       = "agent-remote-access"
-  secret     = base64encode(random_password.tunnel_secret.result)
+  secret     = random_bytes.tunnel_secret.base64
 }
 
 # Configure tunnel ingress rules
@@ -65,7 +64,7 @@ resource "cloudflare_record" "agent_remote_access" {
 resource "local_file" "tunnel_credentials" {
   content = jsonencode({
     AccountTag   = var.cloudflare_account_id
-    TunnelSecret = random_password.tunnel_secret.result
+    TunnelSecret = random_bytes.tunnel_secret.base64
     TunnelID     = cloudflare_tunnel.agent_remote_access.id
     TunnelName   = cloudflare_tunnel.agent_remote_access.name
   })
