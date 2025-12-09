@@ -5,8 +5,20 @@ The Docker container calls this service via host.docker.internal:8001
 """
 import subprocess
 import json
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
 import sys
+
+# Load environment variables from .env file
+env_file = Path(__file__).parent / '.env'
+if env_file.exists():
+    with open(env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key, value = line.split('=', 1)
+                os.environ[key] = value
 
 class ClaudeBridgeHandler(BaseHTTPRequestHandler):
     def do_POST(self):
