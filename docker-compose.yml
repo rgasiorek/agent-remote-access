@@ -12,12 +12,9 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
     volumes:
-      # Only mount sessions for persistence across container restarts
-      - claude-sessions:/app/sessions
+      # Mount sessions directory for persistence and backup
+      # Default: ./sessions (can be changed via SESSIONS_PATH env var)
+      - ${SESSIONS_PATH:-./sessions}:/app/sessions
     env_file:
       - .env
     restart: unless-stopped
-
-volumes:
-  # Named volume for session data - portable across hosts
-  claude-sessions:

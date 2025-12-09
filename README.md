@@ -99,9 +99,9 @@ Choose between Docker (recommended) or local Python installation:
 - ✅ Consistent environment across all operating systems (Linux, macOS, Windows)
 - ✅ No Python version conflicts
 - ✅ Claude Code CLI installed automatically in container
-- ✅ Fully portable - no host dependencies
-- ✅ Sessions persisted in Docker volumes
-- ✅ Zero coupling to host filesystem
+- ✅ Fully portable - only one configurable mount (sessions)
+- ✅ Sessions stored on host for easy backup/migration
+- ✅ Minimal coupling to host filesystem
 
 **Requirements:**
 - Docker and Docker Compose installed
