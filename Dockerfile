@@ -3,14 +3,8 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Claude Code CLI
-RUN curl -fsSL https://claude.com/install.sh | sh
+# No need to install system dependencies or Claude CLI
+# Claude CLI will be mounted from the host
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -27,8 +21,11 @@ RUN mkdir -p /app/sessions /workspace
 EXPOSE 8000
 
 # Set environment variables
+# HOME is needed for Claude CLI to resolve symlinks correctly
 ENV PYTHONUNBUFFERED=1 \
-    CLAUDE_PROJECT_PATH=/workspace
+    CLAUDE_PROJECT_PATH=/workspace \
+    HOME=/Users/montrosesoftware \
+    PATH="/Users/montrosesoftware/.local/bin:$PATH"
 
 # Run the FastAPI server
 CMD ["python", "-m", "server.main"]

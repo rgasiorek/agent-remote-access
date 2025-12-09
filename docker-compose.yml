@@ -7,14 +7,15 @@ services:
     environment:
       - AUTH_USERNAME=${AUTH_USERNAME}
       - AUTH_PASSWORD=${AUTH_PASSWORD}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - CLAUDE_PROJECT_PATH=/workspace
+      - CLAUDE_PROJECT_PATH=${CLAUDE_PROJECT_PATH}
       - HOST=0.0.0.0
       - PORT=8000
     volumes:
-      # Mount sessions directory for persistence and backup
-      # Default: ./sessions (can be changed via SESSIONS_PATH env var)
+      # Mount sessions directory for web app state persistence
       - ${SESSIONS_PATH:-./sessions}:/app/sessions
+    extra_hosts:
+      # Allow container to access host services via host.docker.internal
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     restart: unless-stopped

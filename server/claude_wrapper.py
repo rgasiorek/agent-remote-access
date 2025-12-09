@@ -1,5 +1,6 @@
 import json
 import subprocess
+import requests
 from typing import Optional
 from pydantic import BaseModel
 from server.config import config
@@ -32,7 +33,7 @@ class ClaudeWrapper:
 
     def execute(self, message: str, session_id: Optional[str] = None) -> ClaudeResponse:
         """
-        Execute Claude Code command and parse response
+        Execute Claude Code command via host bridge
 
         Args:
             message: User's message/prompt
@@ -40,30 +41,40 @@ class ClaudeWrapper:
 
         Returns:
             ClaudeResponse with parsed output
-
-        Raises:
-            subprocess.TimeoutExpired: If command exceeds timeout
-            subprocess.CalledProcessError: If command fails
         """
-        # Build command
-        cmd = ["claude", "-p", message, "--output-format", "json"]
+        # Build command arguments
+        args = ["-p", message, "--output-format", "json"]
 
         if session_id:
-            cmd.extend(["--resume", session_id])
+            args.extend(["--resume", session_id])
 
         try:
-            # Execute command
-            result = subprocess.run(
-                cmd,
-                cwd=self.project_path,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout
+            # Call host bridge service
+            response = requests.post(
+                'http://host.docker.internal:8001/execute',
+                json={
+                    'args': args,
+                    'cwd': self.project_path,
+                    'timeout': self.timeout
+                },
+                timeout=self.timeout + 5  # Add buffer to HTTP timeout
             )
 
+            if response.status_code != 200:
+                return ClaudeResponse(
+                    response="",
+                    session_id=session_id or "",
+                    cost=0.0,
+                    turns=0,
+                    success=False,
+                    error=f"Host bridge error: {response.text}"
+                )
+
+            result = response.json()
+
             # Parse JSON output
-            if result.returncode == 0:
-                output = json.loads(result.stdout)
+            if result['returncode'] == 0:
+                output = json.loads(result['stdout'])
 
                 # Extract fields from Claude's JSON response
                 return ClaudeResponse(
@@ -81,10 +92,10 @@ class ClaudeWrapper:
                     cost=0.0,
                     turns=0,
                     success=False,
-                    error=f"Claude CLI error: {result.stderr}"
+                    error=f"Claude CLI error: {result['stderr']}"
                 )
 
-        except subprocess.TimeoutExpired:
+        except requests.Timeout:
             return ClaudeResponse(
                 response="",
                 session_id=session_id or "",
@@ -92,6 +103,16 @@ class ClaudeWrapper:
                 turns=0,
                 success=False,
                 error=f"Request timed out after {self.timeout} seconds"
+            )
+
+        except requests.RequestException as e:
+            return ClaudeResponse(
+                response="",
+                session_id=session_id or "",
+                cost=0.0,
+                turns=0,
+                success=False,
+                error=f"Failed to connect to host bridge: {str(e)}"
             )
 
         except json.JSONDecodeError as e:
