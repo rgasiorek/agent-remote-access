@@ -96,14 +96,16 @@ Choose between Docker (recommended) or local Python installation:
 ### Docker Installation (Recommended)
 
 **Advantages:**
-- Consistent environment across all operating systems
-- No Python version conflicts
-- Claude Code CLI installed automatically
-- Easier deployment
+- ✅ Consistent environment across all operating systems (Linux, macOS, Windows)
+- ✅ No Python version conflicts
+- ✅ Claude Code CLI installed automatically in container
+- ✅ Fully portable - no host dependencies
+- ✅ Sessions persisted in Docker volumes
+- ✅ Zero coupling to host filesystem
 
 **Requirements:**
 - Docker and Docker Compose installed
-- Claude Code CLI installed and authenticated on your HOST machine
+- Anthropic API key (get from https://console.anthropic.com/settings/keys)
 - Cloudflared installed on HOST (for tunnel)
 
 **Quick Start:**
@@ -115,16 +117,20 @@ cd agent-remote-access
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your credentials and project path
+# Edit .env and set:
+#   - AUTH_USERNAME and AUTH_PASSWORD (for web access)
+#   - ANTHROPIC_API_KEY (for Claude Code)
 
 # Build and run with Docker Compose
-docker-compose up -d
+docker compose up -d
 
 # Check logs
-docker-compose logs -f
+docker compose logs -f
 ```
 
-The FastAPI server will be running in Docker on port 8000. Continue to "Exposing via Cloudflare Tunnel" section below.
+The FastAPI server will be running in Docker on port 8000. The container is fully self-contained with no host mounts except a named volume for sessions.
+
+Continue to "Exposing via Cloudflare Tunnel" section below.
 
 ### Local Python Installation
 

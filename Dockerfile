@@ -19,16 +19,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY server/ ./server/
 COPY frontend/ ./frontend/
-COPY sessions/ ./sessions/
 
-# Create sessions directory if it doesn't exist
-RUN mkdir -p /app/sessions
+# Create necessary directories
+RUN mkdir -p /app/sessions /workspace
 
 # Expose port
 EXPOSE 8000
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    CLAUDE_PROJECT_PATH=/workspace
 
 # Run the FastAPI server
 CMD ["python", "-m", "server.main"]
