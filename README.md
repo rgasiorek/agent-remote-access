@@ -86,7 +86,8 @@ This project creates a **remote access bridge** to interact with Claude Code CLI
 - Python 3.8 or higher
 - Claude Code CLI installed and authenticated
 - Cloudflare account (free tier works great)
-- A domain managed by Cloudflare (or use Cloudflare's free subdomain)
+- **For persistent access**: A domain managed by Cloudflare (see options below)
+- **For quick testing**: No domain needed - use TryCloudflare
 
 ## Installation
 
@@ -189,14 +190,44 @@ The server will start on `http://127.0.0.1:8000`
 
 ### Exposing via Cloudflare Tunnel
 
+You have two options for exposing your local server:
+
+#### Option 1: Quick Testing with TryCloudflare (No Domain Required)
+
+**Perfect for:** Testing, development, temporary access
+
+```bash
+# Start a quick tunnel - gives you a random URL instantly
+cloudflared tunnel --url http://localhost:8000
+```
+
+This will output something like:
+```
+https://random-words-here-something.trycloudflare.com
+```
+
+**Pros:**
+- No domain required
+- Works immediately
+- Free and simple
+
+**Cons:**
+- URL changes every time you restart
+- No uptime guarantee (testing only)
+- Not suitable for production
+
+#### Option 2: Persistent Named Tunnel (Requires Domain)
+
+**Perfect for:** Production use, consistent URLs, long-term access
+
 In a new terminal:
 
 ```bash
-# Run the tunnel (replace with your tunnel name)
-cloudflared tunnel run agent-remote-access --url http://localhost:8000
+# Run your named tunnel (requires Terraform setup - see below)
+cloudflared tunnel --config .cloudflared/config.yml run agent-remote-access
 ```
 
-Or use a config file for persistence. Create `~/.cloudflared/config.yml`:
+Or use a config file at `~/.cloudflared/config.yml`:
 
 ```yaml
 tunnel: agent-remote-access
@@ -222,24 +253,51 @@ Your tunnel will be available at: `https://remote-agent.yourdomain.com`
 3. Select a session from the dropdown or start a new one
 4. Start chatting with Claude Code!
 
-## Alternative: Terraform Automation
+## Domain Options for Persistent Tunnels
 
-For automated Cloudflare Tunnel setup, use the included Terraform configuration:
+**IMPORTANT:** Named Cloudflare Tunnels require a domain. The `.cfargotunnel.com` subdomain is NOT publicly accessible.
 
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your Cloudflare credentials
-terraform init
-terraform apply
-```
+### Option A: Buy a Domain (Recommended for Production)
+
+1. **Register a cheap domain** ($1-10/year):
+   - Cloudflare Registrar (cheapest, built-in)
+   - Namecheap, Porkbun, etc.
+
+2. **Add domain to Cloudflare**:
+   - Add site in Cloudflare dashboard
+   - Update nameservers at your registrar
+   - Wait for DNS propagation (~5-60 minutes)
+
+3. **Use Terraform to automate setup**:
+   ```bash
+   cd terraform
+   cp terraform.tfvars.example terraform.tfvars
+   # Edit terraform.tfvars with your Cloudflare credentials and domain
+   terraform init
+   terraform apply
+   ```
 
 This automatically creates:
 - Cloudflare Tunnel
-- DNS record
+- DNS CNAME record pointing to your tunnel
 - Local credentials and config files
 
 See [`terraform/README.md`](terraform/README.md) for detailed instructions.
+
+### Option B: Free Subdomain Services
+
+Use a free DNS provider and manually create CNAME records:
+
+**Popular Free Options:**
+- **Duck DNS** (duckdns.org) - Simple, reliable
+- **FreeDNS** (freedns.afraid.org) - Many TLDs available
+- **No-IP** (noip.com) - Free tier available
+
+**Setup Steps:**
+1. Create free subdomain (e.g., `myproject.duckdns.org`)
+2. Create CNAME record: `<TUNNEL-ID>.cfargotunnel.com`
+3. Update your tunnel config with the subdomain
+4. Run `cloudflared tunnel run agent-remote-access`
 
 ## Project Structure
 
@@ -452,6 +510,15 @@ If you see "control stream encountered a failure" errors:
    ```
 
 ### Common Issues
+
+**"Could not resolve host: *.cfargotunnel.com" or tunnel URL not accessible**
+- **Problem**: Named tunnels do NOT get public DNS automatically
+- **Solution**: You MUST either:
+  1. Use TryCloudflare for quick testing: `cloudflared tunnel --url http://localhost:8000`
+  2. Add a domain to your Cloudflare account and configure DNS records
+  3. Use a free subdomain service (Duck DNS, FreeDNS)
+- The `.cfargotunnel.com` subdomain exists but is NOT publicly routable
+- See "Domain Options for Persistent Tunnels" section above
 
 **"Cannot determine default origin certificate path"**
 - Solution: Always specify `--config` flag with full path to config.yml
