@@ -91,6 +91,43 @@ This project creates a **remote access bridge** to interact with Claude Code CLI
 
 ## Installation
 
+Choose between Docker (recommended) or local Python installation:
+
+### Docker Installation (Recommended)
+
+**Advantages:**
+- Consistent environment across all operating systems
+- No Python version conflicts
+- Claude Code CLI installed automatically
+- Easier deployment
+
+**Requirements:**
+- Docker and Docker Compose installed
+- Claude Code CLI installed and authenticated on your HOST machine
+- Cloudflared installed on HOST (for tunnel)
+
+**Quick Start:**
+
+```bash
+# Clone the repository
+git clone https://github.com/rgasiorek/agent-remote-access.git
+cd agent-remote-access
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your credentials and project path
+
+# Build and run with Docker Compose
+docker-compose up -d
+
+# Check logs
+docker-compose logs -f
+```
+
+The FastAPI server will be running in Docker on port 8000. Continue to "Exposing via Cloudflare Tunnel" section below.
+
+### Local Python Installation
+
 ### 1. Clone and Setup
 
 ```bash
@@ -177,6 +214,26 @@ PORT=8000
 ## Usage
 
 ### Starting the Server
+
+#### With Docker (Recommended)
+
+```bash
+# Start the containerized server
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the server
+docker-compose down
+
+# Rebuild after code changes
+docker-compose up -d --build
+```
+
+The server will be accessible on `http://localhost:8000` (from host)
+
+#### Without Docker (Local Python)
 
 ```bash
 # Activate virtual environment (if not already active)

@@ -1,0 +1,28 @@
+services:
+  fastapi:
+    build: .
+    container_name: claude-remote-access
+    ports:
+      - "8000:8000"
+    environment:
+      - AUTH_USERNAME=${AUTH_USERNAME}
+      - AUTH_PASSWORD=${AUTH_PASSWORD}
+      - CLAUDE_PROJECT_PATH=${CLAUDE_PROJECT_PATH:-/workspace}
+      - HOST=0.0.0.0
+      - PORT=8000
+    volumes:
+      # Mount Claude CLI config from host
+      - ${HOME}/.claude:/root/.claude:ro
+      # Mount project directory (if specified)
+      - ${CLAUDE_PROJECT_PATH:-./workspace}:/workspace
+      # Mount sessions for persistence
+      - ./sessions:/app/sessions
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - claude-network
+
+networks:
+  claude-network:
+    driver: bridge
