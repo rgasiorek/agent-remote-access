@@ -85,14 +85,22 @@ class ClaudeWrapper:
                     success=True
                 )
             else:
-                # Command failed
+                # Command failed - try to parse error from stdout JSON
+                error_msg = result['stderr']
+                try:
+                    error_output = json.loads(result['stdout'])
+                    if error_output.get('is_error'):
+                        error_msg = error_output.get('result', error_msg)
+                except:
+                    pass
+
                 return ClaudeResponse(
                     response="",
                     session_id=session_id or "",
                     cost=0.0,
                     turns=0,
                     success=False,
-                    error=f"Claude CLI error: {result['stderr']}"
+                    error=f"Agent CLI error: {error_msg}"
                 )
 
         except requests.Timeout:

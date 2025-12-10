@@ -134,5 +134,8 @@ if __name__ == '__main__':
     port = 8001
     server = HTTPServer(('0.0.0.0', port), AgentBridgeHandler)
     print(f"Agent Host Bridge running on port {port}")
-    print("Waiting for requests from Docker container...")
+    print("Waiting for requests from web interface...")
+    print(f"Available endpoints:")
+    print(f"  POST /execute - Execute agent CLI commands")
+    print(f"  GET /sessions - List available sessions")
     server.serve_forever()
