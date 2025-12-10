@@ -23,6 +23,58 @@ if env_file.exists():
                 os.environ[key] = value
 
 class AgentBridgeHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/sessions':
+            self._handle_sessions()
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def _handle_sessions(self):
+        """List available Claude Code sessions from history"""
+        from pathlib import Path
+
+        history_file = Path.home() / '.claude' / 'history.jsonl'
+
+        if not history_file.exists():
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'sessions': []}).encode())
+            return
+
+        sessions = {}
+        try:
+            with open(history_file, 'r') as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line)
+                        session_id = entry.get('sessionId')
+                        if session_id:
+                            # Keep only the most recent entry for each session
+                            sessions[session_id] = {
+                                'session_id': session_id,
+                                'display': entry.get('display', '')[:100],
+                                'project': entry.get('project', ''),
+                                'timestamp': entry.get('timestamp', 0)
+                            }
+                    except json.JSONDecodeError:
+                        continue
+
+            # Sort by timestamp, most recent first
+            sorted_sessions = sorted(sessions.values(), key=lambda x: x['timestamp'], reverse=True)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'sessions': sorted_sessions[:20]}).encode())
+
+        except Exception as e:
+            self.send_response(500)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': str(e)}).encode())
+
     def do_POST(self):
         if self.path != '/execute':
             self.send_response(404)

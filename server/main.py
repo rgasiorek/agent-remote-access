@@ -137,11 +137,20 @@ async def reset(conv_id: str = "default", username: str = Depends(verify_auth)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
 
-# Get all sessions (requires auth) - useful for debugging
+# Get available Claude Code sessions from host bridge
 @app.get("/api/sessions")
 async def get_sessions(username: str = Depends(verify_auth)):
-    """Get all active sessions (debug endpoint)"""
-    return session_manager.get_all_sessions()
+    """List available Claude Code sessions that can be resumed"""
+    import requests
+
+    try:
+        response = requests.get('http://host.docker.internal:8001/sessions', timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(status_code=500, detail="Failed to fetch sessions from host bridge")
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Cannot connect to host bridge: {str(e)}")
 
 def main():
     """Start the server"""
