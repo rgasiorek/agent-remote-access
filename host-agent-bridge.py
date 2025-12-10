@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-Simple HTTP bridge that runs on the host to execute Claude CLI commands.
+Simple HTTP bridge that runs on the host to execute AI agent CLI commands.
 The Docker container calls this service via host.docker.internal:8001
+
+Supports any AI agent CLI that follows similar patterns (Claude Code, etc.)
 """
 import subprocess
 import json
@@ -20,7 +22,7 @@ if env_file.exists():
                 key, value = line.split('=', 1)
                 os.environ[key] = value
 
-class ClaudeBridgeHandler(BaseHTTPRequestHandler):
+class AgentBridgeHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != '/execute':
             self.send_response(404)
@@ -38,9 +40,12 @@ class ClaudeBridgeHandler(BaseHTTPRequestHandler):
         timeout = request_data.get('timeout', 300)
 
         try:
-            # Execute claude command
+            # Get agent CLI command from env (defaults to 'claude')
+            cli_command = os.getenv('AGENT_CLI_COMMAND', 'claude')
+
+            # Execute agent CLI command
             result = subprocess.run(
-                ['/Users/montrosesoftware/.local/bin/claude'] + args,
+                [cli_command] + args,
                 cwd=cwd,
                 capture_output=True,
                 text=True,
@@ -71,11 +76,11 @@ class ClaudeBridgeHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         # Custom logging
-        sys.stderr.write(f"[ClaudeBridge] {format % args}\n")
+        sys.stderr.write(f"[AgentBridge] {format % args}\n")
 
 if __name__ == '__main__':
     port = 8001
-    server = HTTPServer(('0.0.0.0', port), ClaudeBridgeHandler)
-    print(f"Claude Host Bridge running on port {port}")
+    server = HTTPServer(('0.0.0.0', port), AgentBridgeHandler)
+    print(f"Agent Host Bridge running on port {port}")
     print("Waiting for requests from Docker container...")
     server.serve_forever()

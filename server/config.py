@@ -11,8 +11,11 @@ class Config:
     AUTH_USERNAME: str = os.getenv("AUTH_USERNAME", "")
     AUTH_PASSWORD: str = os.getenv("AUTH_PASSWORD", "")
 
-    # Claude project path
+    # Agent project path
     PROJECT_PATH: str = os.getenv("CLAUDE_PROJECT_PATH", os.getcwd())
+
+    # Agent CLI command (defaults to 'claude' for Claude Code)
+    AGENT_CLI_COMMAND: str = os.getenv("AGENT_CLI_COMMAND", "claude")
 
     # Session storage
     SESSION_FILE: str = os.path.join(os.getcwd(), "sessions", "sessions.json")
