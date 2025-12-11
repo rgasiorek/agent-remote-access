@@ -64,13 +64,16 @@ async function sendMessage() {
     if (!message) return;
 
     // Disable input while sending
-    setInputState(false);
+    setInputState(false, 'Sending...');
 
     // Add user message to chat
     addMessage('user', message);
 
     // Clear input
     messageInput.value = '';
+
+    // Add status message
+    const statusMsg = addStatusMessage('Sending message to agent...');
 
     try {
         // Send to Agent API
@@ -82,6 +85,9 @@ async function sendMessage() {
                 session_id: sessionId
             })
         });
+
+        // Update status - agent received the message
+        updateStatusMessage(statusMsg, '✓ Agent received message, thinking...');
 
         if (response.status === 401) {
             // Auth failed - clear credentials and retry
@@ -100,6 +106,9 @@ async function sendMessage() {
         const data = await response.json();
 
         if (data.success) {
+            // Remove status message
+            removeStatusMessage(statusMsg);
+
             // Update session
             sessionId = data.session_id;
             localStorage.setItem('claude_session_id', sessionId);
@@ -113,15 +122,23 @@ async function sendMessage() {
             // Add Claude's response
             addMessage('assistant', data.response);
         } else {
-            // Show error
+            // Update status to show error
+            updateStatusMessage(statusMsg, '✗ Error: ' + (data.error || 'Unknown error occurred'), 'error');
+
+            // Also add error message
             addMessage('error', `Error: ${data.error || 'Unknown error occurred'}`);
+
+            // Remove status after a delay
+            setTimeout(() => removeStatusMessage(statusMsg), 3000);
         }
 
     } catch (error) {
         console.error('Error sending message:', error);
+        updateStatusMessage(statusMsg, '✗ Failed to send message', 'error');
         addMessage('error', `Failed to send message: ${error.message}`);
+        setTimeout(() => removeStatusMessage(statusMsg), 3000);
     } finally {
-        setInputState(true);
+        setInputState(true, 'Send');
         messageInput.focus();
     }
 }
@@ -197,10 +214,36 @@ function updateSessionInfo() {
     }
 }
 
-function setInputState(enabled) {
+function setInputState(enabled, buttonText = null) {
     messageInput.disabled = !enabled;
     sendBtn.disabled = !enabled;
-    sendBtn.textContent = enabled ? 'Send' : 'Sending...';
+    if (buttonText) {
+        sendBtn.textContent = buttonText;
+    } else {
+        sendBtn.textContent = enabled ? 'Send' : 'Sending...';
+    }
+}
+
+function addStatusMessage(text, type = 'info') {
+    const statusDiv = document.createElement('div');
+    statusDiv.className = `status-message status-${type}`;
+    statusDiv.textContent = text;
+    chatContainer.appendChild(statusDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    return statusDiv;
+}
+
+function updateStatusMessage(statusDiv, text, type = 'info') {
+    if (statusDiv && statusDiv.parentNode) {
+        statusDiv.textContent = text;
+        statusDiv.className = `status-message status-${type}`;
+    }
+}
+
+function removeStatusMessage(statusDiv) {
+    if (statusDiv && statusDiv.parentNode) {
+        statusDiv.remove();
+    }
 }
 
 function saveChatHistory() {
