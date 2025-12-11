@@ -84,7 +84,8 @@ This project creates a **remote access bridge** to interact with Claude Code CLI
 ## Prerequisites
 
 - Python 3.8 or higher
-- Claude Code CLI installed and authenticated
+- Claude Code CLI installed (`npm install -g @anthropic-ai/claude-code`)
+- **Claude CLI authenticated** - Run `claude login` in your terminal before starting
 - Cloudflare account (free tier works great)
 - **For persistent access**: A domain managed by Cloudflare (see options below)
 - **For quick testing**: No domain needed - use TryCloudflare
@@ -105,12 +106,15 @@ Choose between Docker (recommended) or local Python installation:
 
 **Requirements:**
 - Docker and Docker Compose installed
-- Anthropic API key (get from https://console.anthropic.com/settings/keys)
+- Claude CLI authenticated - run `claude login` on your host machine first
 - Cloudflared installed on HOST (for tunnel)
 
 **Quick Start:**
 
 ```bash
+# Authenticate with Claude (REQUIRED FIRST)
+claude login
+
 # Clone the repository
 git clone https://github.com/rgasiorek/agent-remote-access.git
 cd agent-remote-access
@@ -119,7 +123,6 @@ cd agent-remote-access
 cp .env.example .env
 # Edit .env and set:
 #   - AUTH_USERNAME and AUTH_PASSWORD (for web access)
-#   - ANTHROPIC_API_KEY (for Claude Code)
 
 # Build and run with Docker Compose
 docker compose up -d
@@ -196,7 +199,18 @@ Or use Cloudflare's free subdomain:
 cloudflared tunnel route dns agent-remote-access <TUNNEL-ID>.cfargotunnel.com
 ```
 
-### 3. Configure Environment
+### 3. Authenticate with Claude CLI
+
+**IMPORTANT:** You must authenticate with Claude Code CLI before starting the servers.
+
+```bash
+# Run this once to authenticate (opens browser)
+claude login
+```
+
+This creates `~/.claude.json` with your authentication credentials. The agent-remote-access system will use this session for all Claude API calls.
+
+### 4. Configure Environment
 
 ```bash
 # Copy environment template
@@ -216,6 +230,8 @@ CLAUDE_PROJECT_PATH=/Users/you/my-project
 HOST=127.0.0.1
 PORT=8000
 ```
+
+**Note:** You do NOT need to set `ANTHROPIC_API_KEY` in `.env` - the system uses your `claude login` session.
 
 ## Usage
 
@@ -469,8 +485,14 @@ Each conversation maintains:
 - Copy `.env.example` to `.env` and configure credentials
 
 ### "claude: command not found"
-- Ensure Claude Code CLI is installed and in PATH
+- Install Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
 - Run `claude --version` to verify
+
+### "Invalid API key" or authentication errors
+- Run `claude login` in your terminal to authenticate
+- The system will automatically use the session from `~/.claude.json`
+- Do NOT set `ANTHROPIC_API_KEY` in `.env` - it will override your login session
+- Check authentication status: `claude auth status`
 
 ### Authentication prompt keeps appearing
 - Verify credentials in `.env` match what you're entering

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code Remote Access</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Claude Code Remote</h1>
+            <div class="header-info">
+                <select id="session-select" class="session-select">
+                    <option value="">New Session</option>
+                </select>
+                <span id="session-info" class="info-badge">No active session</span>
+                <button id="reset-btn" class="btn-secondary">New Conversation</button>
+            </div>
+        </header>
+
+        <div class="chat-container" id="chat-container">
+            <div class="welcome-message">
+                <h2>Welcome to Claude Code Remote Access</h2>
+                <p>Send a message to start interacting with your local Claude Code agent.</p>
+                <p class="project-info">Connected to your local project</p>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <textarea
+                id="message-input"
+                placeholder="Type your message here..."
+                rows="3"
+            ></textarea>
+            <button id="send-btn" class="btn-primary">Send</button>
+        </div>
+
+        <div class="stats-container">
+            <div class="stat">
+                <span class="stat-label">Turns:</span>
+                <span id="turn-count">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Total Cost:</span>
+                <span id="total-cost">$0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

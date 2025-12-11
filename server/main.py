@@ -8,7 +8,6 @@ from pathlib import Path
 
 from server.config import config
 from server.auth import verify_auth
-from server.session_manager import session_manager
 from server.claude_wrapper import claude_wrapper
 
 # Validate configuration on startup
@@ -25,7 +24,6 @@ app = FastAPI(
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
-    conv_id: Optional[str] = "default"
 
 class ChatResponse(BaseModel):
     response: str
@@ -34,10 +32,6 @@ class ChatResponse(BaseModel):
     turns: int
     success: bool
     error: Optional[str] = None
-
-class ResetResponse(BaseModel):
-    message: str
-    conv_id: str
 
 # Health check (no auth required)
 @app.get("/health")
@@ -84,24 +78,14 @@ async def chat(request: ChatRequest, username: str = Depends(verify_auth)):
         ChatResponse with Claude's response and session info
     """
     try:
-        # Get existing session or None for new conversation
-        conv_id = request.conv_id or "default"
-        existing_session = request.session_id or session_manager.get_session(conv_id)
+        # Simple: use provided session_id or None (start new session)
+        # No automatic session management - user must explicitly provide session_id to resume
 
         # Execute Claude command
         result = claude_wrapper.execute(
             message=request.message,
-            session_id=existing_session
+            session_id=request.session_id  # None = new session, provided = resume that session
         )
-
-        # Update session if successful
-        if result.success:
-            session_manager.update_session(
-                conv_id=conv_id,
-                session_id=result.session_id,
-                turn_count=result.turns,
-                last_message=request.message
-            )
 
         return ChatResponse(
             response=result.response,
@@ -115,27 +99,8 @@ async def chat(request: ChatRequest, username: str = Depends(verify_auth)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
-# Reset conversation endpoint (requires auth)
-@app.post("/api/reset", response_model=ResetResponse)
-async def reset(conv_id: str = "default", username: str = Depends(verify_auth)):
-    """
-    Reset conversation session
-
-    Args:
-        conv_id: Conversation ID to reset (default: "default")
-        username: Authenticated username
-
-    Returns:
-        ResetResponse confirming reset
-    """
-    try:
-        session_manager.reset_session(conv_id)
-        return ResetResponse(
-            message="Conversation reset successfully",
-            conv_id=conv_id
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
+# Note: No /api/reset endpoint needed - system is stateless
+# To start a new conversation, simply don't provide a session_id in the request
 
 # Get available Claude Code sessions from host bridge
 @app.get("/api/sessions")
