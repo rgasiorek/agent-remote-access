@@ -64,4 +64,11 @@ else
     echo -e "${YELLOW}No running servers found${NC}"
 fi
 
+# Stop Cloudflare tunnel if running
+if pgrep -f "cloudflared tunnel" >/dev/null 2>&1; then
+    echo "Stopping Cloudflare tunnel..."
+    pkill -f "cloudflared tunnel"
+    echo -e "${GREEN}✓ Cloudflare tunnel stopped${NC}"
+fi
+
 echo ""

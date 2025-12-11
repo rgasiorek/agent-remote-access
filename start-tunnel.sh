@@ -48,8 +48,25 @@ echo ""
 echo "The tunnel will give you a public URL like:"
 echo "  https://random-words.trycloudflare.com"
 echo ""
-echo "Copy the URL from the output below and use it to access remotely!"
+echo "Extracting tunnel URL and sending email notification..."
 echo ""
 
-# Run TryCloudflare tunnel - gives free public URL
-cloudflared tunnel --url http://localhost:8000
+# Run TryCloudflare and capture output
+cloudflared tunnel --url http://localhost:8000 2>&1 | tee /tmp/cloudflared-output.log | while IFS= read -r line; do
+    echo "$line"
+
+    # Extract tunnel URL from output
+    if echo "$line" | grep -q "https://.*\.trycloudflare\.com"; then
+        TUNNEL_URL=$(echo "$line" | grep -o "https://[^[:space:]]*\.trycloudflare\.com")
+        if [ -n "$TUNNEL_URL" ]; then
+            echo ""
+            echo -e "${GREEN}========================================${NC}"
+            echo -e "${GREEN}Tunnel URL: $TUNNEL_URL${NC}"
+            echo -e "${GREEN}========================================${NC}"
+            echo ""
+
+            # Send email notification (async, don't block tunnel)
+            python3 "$SCRIPT_DIR/send-tunnel-email.py" "$TUNNEL_URL" &
+        fi
+    fi
+done
