@@ -260,10 +260,14 @@ function updateStats() {
 }
 
 function updateSessionInfo() {
+    console.log('updateSessionInfo called, sessionId:', sessionId);
     if (sessionId) {
-        sessionInfo.textContent = `● ${sessionId.substring(0, 8)}`;
+        const badgeText = `● ${sessionId.substring(0, 8)}`;
+        console.log('Setting badge to:', badgeText);
+        sessionInfo.textContent = badgeText;
         sessionInfo.className = 'info-badge active';
     } else {
+        console.log('No session, setting badge to: ● no session');
         sessionInfo.textContent = '● no session';
         sessionInfo.className = 'info-badge';
     }
@@ -399,9 +403,11 @@ async function loadSessions() {
 
 function switchSession() {
     const selectedSessionId = sessionSelect.value;
+    console.log('switchSession called, selected:', selectedSessionId);
 
     if (!selectedSessionId) {
         // No session selected - clear everything
+        console.log('No session selected, clearing...');
         sessionId = null;
         turnCount = 0;
         totalCost = 0;
@@ -419,6 +425,7 @@ function switchSession() {
     }
 
     // Switch to selected session
+    console.log('Setting sessionId to:', selectedSessionId);
     sessionId = selectedSessionId;
 
     // Clear current chat
