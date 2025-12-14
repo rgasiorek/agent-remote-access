@@ -5,8 +5,14 @@
 
 set -e
 
+# Remember the directory where the script was called from (the project path)
+PROJECT_DIR="$(pwd)"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+# Export project path for the servers to use (where the script was called from)
+export CLAUDE_PROJECT_PATH="$PROJECT_DIR"
 
 # Colors for output
 GREEN='\033[0;32m'
