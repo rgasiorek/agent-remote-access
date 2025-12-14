@@ -18,23 +18,24 @@ echo "====================="
 KILLED=false
 
 # Stop Nginx
-if [ -f logs/nginx.pid ]; then
-    NGINX_PID=$(cat logs/nginx.pid)
-    if ps -p $NGINX_PID > /dev/null 2>&1; then
-        echo "Killing Nginx (PID: $NGINX_PID)..."
-        kill $NGINX_PID 2>/dev/null && KILLED=true
-        rm -f logs/nginx.pid
-    else
-        echo "Nginx PID file exists but process not running"
+if command -v nginx &> /dev/null; then
+    # Check if Nginx is running
+    if lsof -ti:80 >/dev/null 2>&1; then
+        echo "Stopping Nginx..."
+        nginx -c "$SCRIPT_DIR/nginx.conf" -p "$SCRIPT_DIR" -s stop 2>/dev/null
+        if [ $? -eq 0 ]; then
+            KILLED=true
+            echo -e "${GREEN}✓ Nginx stopped${NC}"
+        else
+            # Fallback to force kill if graceful stop fails
+            NGINX_PIDS=$(lsof -ti:80 2>/dev/null || true)
+            if [ -n "$NGINX_PIDS" ]; then
+                echo "Force killing Nginx processes..."
+                kill -9 $NGINX_PIDS 2>/dev/null && KILLED=true
+            fi
+        fi
         rm -f logs/nginx.pid
     fi
-fi
-
-# Also try to kill by port (in case PID file is missing)
-NGINX_PID=$(lsof -ti:80 2>/dev/null || true)
-if [ -n "$NGINX_PID" ]; then
-    echo "Found Nginx on port 80 (PID: $NGINX_PID), killing..."
-    kill $NGINX_PID 2>/dev/null && KILLED=true
 fi
 
 # Stop application services
