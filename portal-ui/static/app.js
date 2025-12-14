@@ -183,13 +183,13 @@ async function sendMessage() {
     }, 2000); // Update every 2 seconds
 
     try {
-        // Step 1: Submit async task
-        const submitResponse = await fetch(`${AGENT_API_URL}/api/chat/async`, {
+        // Step 1: Submit async task (RESTful: /api/sessions/{session_id}/chat)
+        const effectiveSessionId = sessionId || 'new';
+        const submitResponse = await fetch(`${AGENT_API_URL}/api/sessions/${effectiveSessionId}/chat`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
-                message: message,
-                session_id: sessionId
+                message: message
             })
         });
 
@@ -209,10 +209,10 @@ async function sendMessage() {
         const submitData = await submitResponse.json();
         const taskId = submitData.task_id;
 
-        // Step 2: Poll for completion every 5 seconds
+        // Step 2: Poll for completion every 5 seconds (RESTful: /api/sessions/{session_id}/tasks/{task_id})
         const pollInterval = setInterval(async () => {
             try {
-                const statusResponse = await fetch(`${AGENT_API_URL}/api/chat/status/${taskId}`, {
+                const statusResponse = await fetch(`${AGENT_API_URL}/api/sessions/${effectiveSessionId}/tasks/${taskId}`, {
                     headers: getAuthHeaders()
                 });
 
@@ -248,8 +248,8 @@ async function sendMessage() {
                         addMessage('assistant', result.result);
                     }
 
-                    // Step 3: Cleanup task file after rendering
-                    fetch(`${AGENT_API_URL}/api/chat/cleanup/${taskId}`, {
+                    // Step 3: Cleanup task file after rendering (RESTful: DELETE /api/sessions/{session_id}/tasks/{task_id})
+                    fetch(`${AGENT_API_URL}/api/sessions/${effectiveSessionId}/tasks/${taskId}`, {
                         method: 'DELETE',
                         headers: getAuthHeaders()
                     }).catch(err => console.warn('Cleanup failed:', err));

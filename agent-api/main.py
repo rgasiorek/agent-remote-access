@@ -95,20 +95,28 @@ async def chat(request: ChatRequest, username: str = Depends(verify_auth)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
-# Async chat endpoints to bypass Cloudflare timeout
-@app.post("/api/chat/async", response_model=AsyncTaskResponse)
-async def chat_async(request: ChatRequest, username: str = Depends(verify_auth)):
+# RESTful async chat endpoints to bypass Cloudflare timeout
+@app.post("/api/sessions/{session_id}/chat", response_model=AsyncTaskResponse)
+async def submit_chat_task(session_id: str, request: ChatRequest, username: str = Depends(verify_auth)):
     """
-    Submit async task to Claude Code - returns immediately with task_id
-    Client should poll /api/chat/status/{task_id} for results
+    Submit async chat task to Claude Code - returns immediately with task_id
+
+    Args:
+        session_id: Session ID to resume, or "new" for new session
+        request: ChatRequest with message
+
+    Returns:
+        AsyncTaskResponse with task_id for polling
     """
     task_id = str(uuid.uuid4())
     output_file = f"/tmp/claude_task_{task_id}.json"
 
     # Build command
     args = ["claude", "-p", request.message, "--output-format", "json"]
-    if request.session_id:
-        args.extend(["--resume", request.session_id])
+
+    # Use session_id from path if not "new"
+    if session_id != "new":
+        args.extend(["--resume", session_id])
 
     # Start Claude CLI with output redirected to temp file
     try:
@@ -125,11 +133,17 @@ async def chat_async(request: ChatRequest, username: str = Depends(verify_auth))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start task: {str(e)}")
 
-@app.get("/api/chat/status/{task_id}", response_model=TaskStatusResponse)
-async def get_task_status(task_id: str, username: str = Depends(verify_auth)):
+@app.get("/api/sessions/{session_id}/tasks/{task_id}", response_model=TaskStatusResponse)
+async def get_task_status(session_id: str, task_id: str, username: str = Depends(verify_auth)):
     """
     Poll for task completion status
-    Returns "processing" while running, "completed" with result when done
+
+    Args:
+        session_id: Session ID (for REST hierarchy)
+        task_id: Task ID to check
+
+    Returns:
+        TaskStatusResponse with status and result (if completed)
     """
     output_file = f"/tmp/claude_task_{task_id}.json"
 
@@ -155,11 +169,17 @@ async def get_task_status(task_id: str, username: str = Depends(verify_auth)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading task status: {str(e)}")
 
-@app.delete("/api/chat/cleanup/{task_id}")
-async def cleanup_task(task_id: str, username: str = Depends(verify_auth)):
+@app.delete("/api/sessions/{session_id}/tasks/{task_id}")
+async def cleanup_task(session_id: str, task_id: str, username: str = Depends(verify_auth)):
     """
     Cleanup task file after browser has rendered the result
-    Called by frontend after displaying response to user
+
+    Args:
+        session_id: Session ID (for REST hierarchy)
+        task_id: Task ID to cleanup
+
+    Returns:
+        Status message
     """
     output_file = f"/tmp/claude_task_{task_id}.json"
 
