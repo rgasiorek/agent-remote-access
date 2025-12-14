@@ -183,25 +183,17 @@ async function sendMessage() {
     }, 2000); // Update every 2 seconds
 
     try {
-        // Send to Agent API with timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 610000); // 10 minutes + 10 seconds
-
-        const response = await fetch(`${AGENT_API_URL}/api/chat`, {
+        // Step 1: Submit async task
+        const submitResponse = await fetch(`${AGENT_API_URL}/api/chat/async`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
                 message: message,
                 session_id: sessionId
-            }),
-            signal: controller.signal
+            })
         });
 
-        clearTimeout(timeoutId);
-        clearInterval(timeoutWarning);
-
-        if (response.status === 401) {
-            // Auth failed - clear credentials and retry
+        if (submitResponse.status === 401) {
             localStorage.removeItem('auth_credentials');
             authCredentials = null;
             alert('Authentication failed. Please enter your credentials again.');
@@ -209,59 +201,92 @@ async function sendMessage() {
             return;
         }
 
-        if (response.status === 524) {
-            throw new Error('Request timed out. The AI task is taking too long. Try breaking it into smaller requests or check your Cloudflare tunnel timeout settings.');
+        if (!submitResponse.ok) {
+            const errorData = await submitResponse.json().catch(() => ({}));
+            throw new Error(errorData.detail || `HTTP error! status: ${submitResponse.status}`);
         }
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-        }
+        const submitData = await submitResponse.json();
+        const taskId = submitData.task_id;
 
-        const data = await response.json();
+        // Step 2: Poll for completion every 5 seconds
+        const pollInterval = setInterval(async () => {
+            try {
+                const statusResponse = await fetch(`${AGENT_API_URL}/api/chat/status/${taskId}`, {
+                    headers: getAuthHeaders()
+                });
 
-        if (data.success) {
-            // Remove status message
-            removeStatusMessage(statusMsg);
+                if (!statusResponse.ok) {
+                    throw new Error(`Status check failed: ${statusResponse.status}`);
+                }
 
-            // Update session
-            sessionId = data.session_id;
-            localStorage.setItem('claude_session_id', sessionId);
+                const statusData = await statusResponse.json();
 
-            // Update stats
-            turnCount = data.turns;
-            totalCost += data.cost;
-            updateStats();
-            updateSessionInfo();
+                if (statusData.status === 'completed') {
+                    // Stop polling and timer
+                    clearInterval(pollInterval);
+                    clearInterval(timeoutWarning);
+                    removeStatusMessage(statusMsg);
 
-            // Add Claude's response
-            addMessage('assistant', data.response);
-        } else {
-            // Update status to show error
-            updateStatusMessage(statusMsg, '✗ Error: ' + (data.error || 'Unknown error occurred'), 'error');
+                    const result = statusData.result;
 
-            // Also add error message
-            addMessage('error', `Error: ${data.error || 'Unknown error occurred'}`);
+                    if (result.is_error) {
+                        // Handle error response
+                        addMessage('error', `Error: ${result.result || 'Unknown error occurred'}`);
+                    } else {
+                        // Update session
+                        sessionId = result.session_id;
+                        localStorage.setItem('claude_session_id', sessionId);
 
-            // Remove status after a delay
-            setTimeout(() => removeStatusMessage(statusMsg), 3000);
-        }
+                        // Update stats
+                        turnCount = result.num_turns || 0;
+                        totalCost += result.total_cost_usd || 0;
+                        updateStats();
+                        updateSessionInfo();
+
+                        // Add Claude's response
+                        addMessage('assistant', result.result);
+                    }
+
+                    // Step 3: Cleanup task file after rendering
+                    fetch(`${AGENT_API_URL}/api/chat/cleanup/${taskId}`, {
+                        method: 'DELETE',
+                        headers: getAuthHeaders()
+                    }).catch(err => console.warn('Cleanup failed:', err));
+
+                    // Re-enable input
+                    setInputState(true, 'Send');
+                    updateSendButtonState();
+                    if (!sendBtn.disabled) {
+                        messageInput.focus();
+                    }
+                } else if (statusData.status === 'not_found') {
+                    // Task not found
+                    clearInterval(pollInterval);
+                    clearInterval(timeoutWarning);
+                    updateStatusMessage(statusMsg, '✗ Task not found', 'error');
+                    addMessage('error', 'Task not found. Please try again.');
+                    setTimeout(() => removeStatusMessage(statusMsg), 5000);
+
+                    setInputState(true, 'Send');
+                    updateSendButtonState();
+                }
+                // else: status is "processing" - continue polling
+
+            } catch (pollError) {
+                console.error('Poll error:', pollError);
+                // Continue polling even on transient errors
+            }
+        }, 5000); // Poll every 5 seconds
 
     } catch (error) {
         clearInterval(timeoutWarning);
         console.error('Error sending message:', error);
 
-        if (error.name === 'AbortError') {
-            updateStatusMessage(statusMsg, '✗ Request timed out after 10 minutes', 'error');
-            addMessage('error', 'Request timed out after 10 minutes. Try breaking your task into smaller requests.');
-        } else {
-            updateStatusMessage(statusMsg, '✗ Failed to send message', 'error');
-            addMessage('error', `Failed to send message: ${error.message}`);
-        }
+        updateStatusMessage(statusMsg, '✗ Failed to send message', 'error');
+        addMessage('error', `Failed to send message: ${error.message}`);
 
         setTimeout(() => removeStatusMessage(statusMsg), 5000);
-    } finally {
-        clearInterval(timeoutWarning);
         setInputState(true, 'Send');
         updateSendButtonState();
         if (!sendBtn.disabled) {

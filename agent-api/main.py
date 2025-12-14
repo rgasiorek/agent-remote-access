@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import uvicorn
+import subprocess
+import uuid
+import os
+import json
+from pathlib import Path
 
 from config import config
 from auth import verify_auth
@@ -44,6 +49,14 @@ class ChatResponse(BaseModel):
     success: bool
     error: Optional[str] = None
 
+class AsyncTaskResponse(BaseModel):
+    task_id: str
+    status: str  # "processing"
+
+class TaskStatusResponse(BaseModel):
+    status: str  # "processing", "completed", "not_found"
+    result: Optional[dict] = None
+
 # Health check (no auth required)
 @app.get("/health")
 async def health():
@@ -81,6 +94,83 @@ async def chat(request: ChatRequest, username: str = Depends(verify_auth)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+# Async chat endpoints to bypass Cloudflare timeout
+@app.post("/api/chat/async", response_model=AsyncTaskResponse)
+async def chat_async(request: ChatRequest, username: str = Depends(verify_auth)):
+    """
+    Submit async task to Claude Code - returns immediately with task_id
+    Client should poll /api/chat/status/{task_id} for results
+    """
+    task_id = str(uuid.uuid4())
+    output_file = f"/tmp/claude_task_{task_id}.json"
+
+    # Build command
+    args = ["claude", "-p", request.message, "--output-format", "json"]
+    if request.session_id:
+        args.extend(["--resume", request.session_id])
+
+    # Start Claude CLI with output redirected to temp file
+    try:
+        with open(output_file, 'w') as f:
+            subprocess.Popen(
+                args,
+                stdout=f,
+                stderr=subprocess.STDOUT,
+                cwd=claude_wrapper.project_path
+            )
+
+        return AsyncTaskResponse(task_id=task_id, status="processing")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start task: {str(e)}")
+
+@app.get("/api/chat/status/{task_id}", response_model=TaskStatusResponse)
+async def get_task_status(task_id: str, username: str = Depends(verify_auth)):
+    """
+    Poll for task completion status
+    Returns "processing" while running, "completed" with result when done
+    """
+    output_file = f"/tmp/claude_task_{task_id}.json"
+
+    if not os.path.exists(output_file):
+        return TaskStatusResponse(status="not_found")
+
+    # Check if file has content
+    try:
+        with open(output_file, 'r') as f:
+            content = f.read()
+
+        if content.strip():
+            # Process finished - parse result
+            result = json.loads(content)
+            return TaskStatusResponse(status="completed", result=result)
+        else:
+            # File exists but empty - still processing
+            return TaskStatusResponse(status="processing")
+
+    except json.JSONDecodeError:
+        # File has partial content - still writing
+        return TaskStatusResponse(status="processing")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading task status: {str(e)}")
+
+@app.delete("/api/chat/cleanup/{task_id}")
+async def cleanup_task(task_id: str, username: str = Depends(verify_auth)):
+    """
+    Cleanup task file after browser has rendered the result
+    Called by frontend after displaying response to user
+    """
+    output_file = f"/tmp/claude_task_{task_id}.json"
+
+    try:
+        if os.path.exists(output_file):
+            os.remove(output_file)
+            return {"status": "cleaned"}
+        else:
+            return {"status": "not_found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error cleaning up task: {str(e)}")
 
 # Get available Claude Code sessions
 @app.get("/api/sessions")
