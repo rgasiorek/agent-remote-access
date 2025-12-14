@@ -2,52 +2,57 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude Code Remote Access</title>
-    <link rel="stylesheet" href="/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Local Agent - Remote Access</title>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Claude Code Remote</h1>
+            <div class="header-title">
+                <div class="logo">▶</div>
+                <div class="title-text">
+                    <h1>AI Local Agent</h1>
+                    <span class="subtitle">Remote Access</span>
+                </div>
+            </div>
             <div class="header-info">
-                <select id="session-select" class="session-select">
-                    <option value="">New Session</option>
-                </select>
                 <span id="session-info" class="info-badge">No active session</span>
-                <button id="reset-btn" class="btn-secondary">New Conversation</button>
+                <div class="stats">
+                    <span>Turns: <strong id="turn-count">0</strong></span>
+                    <span>Cost: <strong id="total-cost">$0.0000</strong></span>
+                </div>
             </div>
         </header>
 
         <div class="chat-container" id="chat-container">
             <div class="welcome-message">
-                <h2>Welcome to Claude Code Remote Access</h2>
-                <p>Send a message to start interacting with your local Claude Code agent.</p>
-                <p class="project-info">Connected to your local project</p>
+                <h2>Welcome to AI Local Agent</h2>
+                <p>Select a session or send a message to start interacting with your local AI agent.</p>
             </div>
         </div>
 
         <div class="input-container">
-            <textarea
-                id="message-input"
-                placeholder="Type your message here..."
-                rows="3"
-            ></textarea>
-            <button id="send-btn" class="btn-primary">Send</button>
-        </div>
-
-        <div class="stats-container">
-            <div class="stat">
-                <span class="stat-label">Turns:</span>
-                <span id="turn-count">0</span>
+            <div class="session-selector">
+                <select id="session-select">
+                    <option value="">Select session...</option>
+                </select>
+                <button id="reset-btn" class="btn-secondary">New</button>
             </div>
-            <div class="stat">
-                <span class="stat-label">Total Cost:</span>
-                <span id="total-cost">$0.00</span>
+            <div class="message-input-group">
+                <textarea
+                    id="message-input"
+                    placeholder="Message your AI agent..."
+                    rows="2"
+                ></textarea>
+                <button id="send-btn" class="btn-primary">
+                    <span class="btn-icon">→</span>
+                    <span class="btn-text">Send</span>
+                </button>
             </div>
         </div>
     </div>
 
-    <script src="/app.js"></script>
+    <script src="/static/app.js"></script>
 </body>
 </html>
