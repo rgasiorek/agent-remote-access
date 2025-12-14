@@ -55,6 +55,12 @@ async function loadConfig() {
             projectPath = config.project_path;
             if (projectInfoEl) {
                 projectInfoEl.textContent = projectPath;
+                // Show the element only if there's content
+                if (projectPath) {
+                    projectInfoEl.style.display = 'inline-block';
+                } else {
+                    projectInfoEl.style.display = 'none';
+                }
             }
         }
     } catch (error) {
@@ -368,7 +374,7 @@ function switchSession() {
             <div class="welcome-message">
                 <h2>Select a Session</h2>
                 <p>Choose a session from the dropdown to continue an existing conversation.</p>
-                <p class="project-info" id="project-info">${projectPath}</p>
+                ${projectPath ? `<p class="project-info">${projectPath}</p>` : ''}
             </div>
         `;
         updateStats();
@@ -385,7 +391,7 @@ function switchSession() {
         <div class="welcome-message">
             <h2>Session: ${sessionId.substring(0, 8)}...</h2>
             <p>Send a message to resume this conversation.</p>
-            <p class="project-info">${projectPath}</p>
+            ${projectPath ? `<p class="project-info">${projectPath}</p>` : ''}
         </div>
     `;
 
