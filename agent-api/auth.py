@@ -1,4 +1,3 @@
-import base64
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from config import config
