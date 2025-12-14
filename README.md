@@ -17,126 +17,69 @@ cp .env.example .env
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Start services
-./start_all.sh
+# 4. Start services (local only, no tunnel)
+./start_all.sh --no-tunnel
 
-# 5. Expose via Cloudflare (quick test - URL changes on restart)
-cloudflared tunnel --url http://localhost
+# Access at: http://localhost
 ```
 
-Access from mobile: `https://your-tunnel-url.trycloudflare.com`
+**For remote access via Cloudflare:**
+```bash
+./start_all.sh  # Auto-starts tunnel if cloudflared installed
+# Or manually: cloudflared tunnel --url http://localhost
+```
 
 ## REST API
 
-### Async Chat API (Recommended)
+All endpoints require HTTP Basic Auth (except `/health`, `/api/config`):
+```http
+Authorization: Basic base64(username:password)
+```
 
-Polling pattern that bypasses Cloudflare's ~100s timeout. Tasks can run indefinitely.
+### Async Chat API
 
-#### Submit Task
+Polling pattern bypasses Cloudflare ~100s timeout. Tasks run indefinitely.
+
 ```http
 POST /api/sessions/{session_id}/chat
 ```
-- `session_id`: UUID to resume, or `"new"` for new session
-- Body: `{"message": "your task"}`
+- Path: `session_id` = UUID or `"new"`
+- Request: `{"message": "string"}`
 - Response: `{"task_id": "uuid", "status": "processing"}`
-- Returns immediately (< 1s)
 
-#### Poll Status
 ```http
 GET /api/sessions/{session_id}/tasks/{task_id}
 ```
-- Response (processing): `{"status": "processing"}`
-- Response (completed): `{"status": "completed", "result": {...}}`
-- Poll every 5 seconds until completed
+- Response: `{"status": "processing"}` or `{"status": "completed", "result": {...}}`
+- Poll every 5s until completed
 
-#### Cleanup
 ```http
 DELETE /api/sessions/{session_id}/tasks/{task_id}
 ```
 - Response: `{"status": "cleaned"}`
-- Call after displaying result to delete temp file
-
-#### Example Flow
-```javascript
-// 1. Submit
-const {task_id} = await fetch('/api/sessions/new/chat', {
-  method: 'POST',
-  headers: {'Authorization': 'Basic ' + btoa('user:pass')},
-  body: JSON.stringify({message: 'Debug this code'})
-}).then(r => r.json());
-
-// 2. Poll every 5s
-const poll = setInterval(async () => {
-  const {status, result} = await fetch(`/api/sessions/new/tasks/${task_id}`, {
-    headers: {'Authorization': 'Basic ' + btoa('user:pass')}
-  }).then(r => r.json());
-
-  if (status === 'completed') {
-    clearInterval(poll);
-    console.log(result);
-
-    // 3. Cleanup
-    fetch(`/api/sessions/new/tasks/${task_id}`, {
-      method: 'DELETE',
-      headers: {'Authorization': 'Basic ' + btoa('user:pass')}
-    });
-  }
-}, 5000);
-```
-
-**Why polling works:**
-- Cloudflare free tier: ~100s timeout per request
-- Each poll: < 1s (well under limit)
-- Total task duration: unlimited
+- Call after displaying result
 
 ### Session Management
 
-#### List Sessions
 ```http
 GET /api/sessions
 ```
-Response:
-```json
-{
-  "sessions": [
-    {
-      "session_id": "550e8400-...",
-      "display": "First message preview",
-      "project": "/path/to/project",
-      "timestamp": 1234567890
-    }
-  ]
-}
-```
-- Filtered by current `CLAUDE_PROJECT_PATH`
-- Sorted by timestamp (newest first)
-- Limited to 20 sessions
+- Response: `{"sessions": [{"session_id": "...", "display": "...", "project": "...", "timestamp": 0}]}`
+- Filtered by `CLAUDE_PROJECT_PATH`, newest first, max 20
 
-#### Get Config
 ```http
 GET /api/config
 ```
-Response: `{"project_path": "/path/to/project"}`
+- Response: `{"project_path": "/path/to/project"}`
 
-### Authentication
-
-All endpoints (except `/health`, `/api/config`) require HTTP Basic Auth:
-```http
-Authorization: Basic base64(username:password)
-```
-Credentials configured in `.env` file.
-
-### Legacy Sync API
-
-**⚠️ Warning:** Blocks until complete, times out after ~100s via Cloudflare.
+### Sync API
 
 ```http
 POST /api/chat
-Body: {"message": "...", "session_id": "optional-uuid"}
-Response: {"response": "...", "session_id": "...", "cost": 0.05, "turns": 2, "success": true}
 ```
-
-Only use for quick tasks (< 60s).
+- Request: `{"message": "...", "session_id": "optional-uuid"}`
+- Response: `{"response": "...", "session_id": "...", "cost": 0.05, "turns": 2, "success": true}`
+- Blocks until complete, times out after ~100s via Cloudflare
 
 ## Architecture
 

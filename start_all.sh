@@ -2,6 +2,10 @@
 
 # Start script for ALL services (Application + Infrastructure)
 # Starts application services AND Nginx gateway
+#
+# Usage:
+#   ./start_all.sh             # Start everything including Cloudflare tunnel
+#   ./start_all.sh --no-tunnel # Start without Cloudflare tunnel (local only)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -11,6 +15,17 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
+
+# Parse command line arguments
+SKIP_TUNNEL=false
+for arg in "$@"; do
+    case $arg in
+        --no-tunnel)
+            SKIP_TUNNEL=true
+            shift
+            ;;
+    esac
+done
 
 echo -e "${GREEN}Starting ALL Services (Application + Infrastructure)${NC}"
 echo "====================================================="
@@ -26,15 +41,16 @@ if ! command -v nginx &> /dev/null; then
 fi
 echo -e "${GREEN}✓ Nginx found${NC}"
 
-# Check if cloudflared is installed
-if ! command -v cloudflared &> /dev/null; then
+# Check if cloudflared is installed (unless --no-tunnel specified)
+if [ "$SKIP_TUNNEL" = true ]; then
+    echo -e "${YELLOW}Skipping Cloudflare tunnel (--no-tunnel flag)${NC}"
+elif ! command -v cloudflared &> /dev/null; then
     echo -e "${YELLOW}Warning: cloudflared is not installed${NC}"
     echo "Cloudflare tunnel will not be started"
     echo "Install with: brew install cloudflared"
     SKIP_TUNNEL=true
 else
     echo -e "${GREEN}✓ cloudflared found${NC}"
-    SKIP_TUNNEL=false
 fi
 
 # Start application services
