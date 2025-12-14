@@ -10,3 +10,7 @@ INFO:     127.0.0.1:57606 - "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404
 INFO:     127.0.0.1:57607 - "GET /apple-touch-icon.png HTTP/1.1" 404 Not Found
 INFO:     127.0.0.1:57608 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 INFO:     127.0.0.1:57672 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57802 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57802 - "GET /styles.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57878 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57909 - "GET /app.js HTTP/1.1" 200 OK

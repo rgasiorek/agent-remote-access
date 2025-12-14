@@ -8,3 +8,6 @@ Server URL: http://127.0.0.1:8001
 Authentication: rgasiorek / **************
 
 INFO:     127.0.0.1:57604 - "GET /api/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57804 - "GET /api/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57808 - "OPTIONS /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57808 - "POST /api/chat HTTP/1.1" 200 OK

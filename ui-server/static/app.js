@@ -58,8 +58,11 @@ async function loadConfig() {
             // Update header prompt with actual project path
             if (headerPrompt && projectPath) {
                 const username = getCurrentUsername();
-                headerPrompt.textContent = `${username}@agent:${projectPath}$`;
+                const promptText = `${username}@agent:${projectPath}$`;
+                console.log('Updating header to:', promptText);
+                headerPrompt.textContent = promptText;
             } else if (headerPrompt) {
+                console.error('No project path received');
                 headerPrompt.textContent = 'Error: No project path';
             }
 
