@@ -163,12 +163,6 @@ class TestClaudeWrapper:
         assert response.success is False
         assert 'error' in response.error.lower()
 
-    @pytest.mark.skip(reason="Complex file I/O mocking - tested manually")
-    def test_list_sessions_success(self):
-        """Test listing sessions from history file - integration test"""
-        # This is better tested as an integration test with real file
-        pass
-
     @patch('claude_wrapper.Path')
     def test_list_sessions_no_history_file(self, mock_path):
         """Test listing sessions when history file doesn't exist"""
