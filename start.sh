@@ -60,10 +60,10 @@ fi
 
 # Check Python dependencies
 echo "Checking Python dependencies..."
-pip3 list | grep -q fastapi || {
+if ! python3 -c "import fastapi" 2>/dev/null; then
     echo -e "${YELLOW}Installing dependencies...${NC}"
-    pip3 install -r requirements.txt
-}
+    pip3 install -q -r requirements.txt
+fi
 
 # Start Agent API server in background
 echo -e "${GREEN}Starting Agent API server on port 8001...${NC}"
