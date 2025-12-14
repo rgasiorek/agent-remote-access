@@ -1,30 +1,35 @@
 // Chat application state
 const AGENT_API_URL = 'http://localhost:8001';
-let sessionId = null;  // Don't auto-load from localStorage - user must select from dropdown
+const UI_API_URL = 'http://localhost:8000';
+let sessionId = null;  // Don't auto-load - user must select from dropdown
 let totalCost = 0;
 let turnCount = 0;
+let projectPath = '';
 
 // DOM elements
 const chatContainer = document.getElementById('chat-container');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
-const resetBtn = document.getElementById('reset-btn');
 const sessionInfo = document.getElementById('session-info');
 const sessionSelect = document.getElementById('session-select');
 const turnCountEl = document.getElementById('turn-count');
 const totalCostEl = document.getElementById('total-cost');
+const projectInfoEl = document.getElementById('project-info');
 
 // Get auth credentials from localStorage or prompt
 let authCredentials = localStorage.getItem('auth_credentials');
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load config first
+    await loadConfig();
+
     updateSessionInfo();
     loadSessions();
+    updateSendButtonState();
 
     // Event listeners
     sendBtn.addEventListener('click', sendMessage);
-    resetBtn.addEventListener('click', resetConversation);
     sessionSelect.addEventListener('change', switchSession);
 
     // Reload sessions when dropdown is opened
@@ -35,13 +40,27 @@ document.addEventListener('DOMContentLoaded', () => {
     messageInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            sendMessage();
+            if (!sendBtn.disabled) {
+                sendMessage();
+            }
         }
     });
-
-    // Load conversation history from localStorage
-    loadChatHistory();
 });
+
+async function loadConfig() {
+    try {
+        const response = await fetch(`${UI_API_URL}/api/config`);
+        if (response.ok) {
+            const config = await response.json();
+            projectPath = config.project_path;
+            if (projectInfoEl) {
+                projectInfoEl.textContent = projectPath;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load config:', error);
+    }
+}
 
 function getAuthHeaders() {
     if (!authCredentials) {
@@ -58,10 +77,29 @@ function getAuthHeaders() {
     };
 }
 
+function updateSendButtonState() {
+    // Disable send button if no session selected
+    const hasSession = sessionId !== null && sessionId !== '';
+    sendBtn.disabled = !hasSession;
+    messageInput.disabled = !hasSession;
+
+    if (!hasSession) {
+        messageInput.placeholder = 'Select a session first...';
+    } else {
+        messageInput.placeholder = 'Message your AI agent...';
+    }
+}
+
 async function sendMessage() {
     const message = messageInput.value.trim();
 
     if (!message) return;
+
+    // Check if session is selected
+    if (!sessionId) {
+        alert('Please select a session first');
+        return;
+    }
 
     // Disable input while sending
     setInputState(false, 'Sending...');
@@ -139,35 +177,11 @@ async function sendMessage() {
         setTimeout(() => removeStatusMessage(statusMsg), 3000);
     } finally {
         setInputState(true, 'Send');
-        messageInput.focus();
+        updateSendButtonState();
+        if (!sendBtn.disabled) {
+            messageInput.focus();
+        }
     }
-}
-
-function resetConversation() {
-    if (!confirm('Start a new conversation? This will clear the current session.')) {
-        return;
-    }
-
-    // Clear local state
-    sessionId = null;
-    localStorage.removeItem('claude_session_id');
-    turnCount = 0;
-    totalCost = 0;
-
-    // Clear dropdown selection
-    sessionSelect.value = '';
-
-    // Clear UI
-    chatContainer.innerHTML = `
-        <div class="welcome-message">
-            <h2>New Conversation</h2>
-            <p>Send a message to start a new conversation with Claude Code.</p>
-        </div>
-    `;
-    localStorage.removeItem('chat_history');
-
-    updateStats();
-    updateSessionInfo();
 }
 
 function addMessage(role, content) {

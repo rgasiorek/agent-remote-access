@@ -147,6 +147,19 @@ header {
     font-size: 14px;
 }
 
+.project-info {
+    background: #0a1a1f;
+    color: #00d9ff;
+    padding: 8px 16px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-top: 16px;
+    font-size: 12px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    border: 1px solid #00d9ff44;
+    word-break: break-all;
+}
+
 /* Messages */
 .message {
     margin-bottom: 20px;
