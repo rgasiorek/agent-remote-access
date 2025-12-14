@@ -23,6 +23,12 @@ async def health():
     """Health check endpoint"""
     return {"status": "healthy", "service": "ui-server"}
 
+# Config endpoint
+@app.get("/api/config")
+async def get_config():
+    """Get UI configuration including project path"""
+    return {"project_path": config.PROJECT_PATH}
+
 # Serve index.html at root
 @app.get("/")
 async def serve_index():
