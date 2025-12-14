@@ -1,7 +1,6 @@
 // Chat application state
-// Use window.location.hostname to match whatever the user accessed (localhost or 127.0.0.1)
-const AGENT_API_URL = `http://${window.location.hostname}:8001`;
-const UI_API_URL = `http://${window.location.hostname}:8000`;
+const AGENT_API_URL = `${window.location.protocol}//${window.location.host.replace(':8000', ':8001')}`;
+const UI_API_URL = '';  // Empty string = same origin (relative URLs)
 let sessionId = null;  // Don't auto-load - user must select from dropdown
 let totalCost = 0;
 let turnCount = 0;
