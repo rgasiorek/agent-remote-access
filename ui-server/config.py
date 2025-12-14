@@ -11,8 +11,8 @@ class Config:
     AUTH_USERNAME: str = os.getenv("AUTH_USERNAME", "")
     AUTH_PASSWORD: str = os.getenv("AUTH_PASSWORD", "")
 
-    # Agent project path
-    PROJECT_PATH: str = os.getenv("CLAUDE_PROJECT_PATH", os.getcwd())
+    # Agent project path (expand to absolute path)
+    PROJECT_PATH: str = os.path.abspath(os.path.expanduser(os.getenv("CLAUDE_PROJECT_PATH", os.getcwd())))
 
     # Agent CLI command (defaults to 'claude' for Claude Code)
     AGENT_CLI_COMMAND: str = os.getenv("AGENT_CLI_COMMAND", "claude")
