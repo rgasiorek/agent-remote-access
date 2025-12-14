@@ -30,9 +30,10 @@ header {
     font-size: 13px;
 }
 
-.header-title {
+.header-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
     margin-bottom: 6px;
 }
@@ -44,11 +45,14 @@ header {
     white-space: nowrap;
 }
 
+.title-text {
+    text-align: right;
+}
+
 .title-text h1 {
     font-size: 14px;
     font-weight: bold;
     color: #0087af;
-    text-transform: uppercase;
     letter-spacing: 1px;
 }
 

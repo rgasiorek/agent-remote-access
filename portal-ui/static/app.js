@@ -1,6 +1,5 @@
 // Chat application state
-const AGENT_API_URL = `${window.location.protocol}//${window.location.host.replace(':8000', ':8001')}`;
-const UI_API_URL = '';  // Empty string = same origin (relative URLs)
+let AGENT_API_URL = '';  // Will be loaded from config
 let sessionId = null;  // Don't auto-load - user must select from dropdown
 let totalCost = 0;
 let turnCount = 0;
@@ -22,7 +21,10 @@ let authCredentials = localStorage.getItem('auth_credentials');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    // Load config first
+    // Load frontend config first to get agent API URL
+    await loadFrontendConfig();
+
+    // Then load project config
     await loadConfig();
 
     updateSessionInfo();
@@ -48,10 +50,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
+async function loadFrontendConfig() {
+    // All API requests now go through the portal-ui proxy at /api/*
+    // This works for both local (direct) and remote (Cloudflare) access
+    AGENT_API_URL = window.location.origin;
+    console.log('Using portal-ui proxy for API calls, base URL:', AGENT_API_URL);
+}
+
 async function loadConfig() {
-    console.log('loadConfig: Starting config fetch from', `${UI_API_URL}/api/config`);
+    console.log('loadConfig: Starting config fetch from', `${AGENT_API_URL}/api/config`);
     try {
-        const response = await fetch(`${UI_API_URL}/api/config`);
+        const response = await fetch(`${AGENT_API_URL}/api/config`);
         console.log('loadConfig: Fetch response status:', response.status, response.ok);
 
         if (response.ok) {
@@ -62,7 +71,7 @@ async function loadConfig() {
             // Update header prompt with actual project path
             if (headerPrompt && projectPath) {
                 const username = getCurrentUsername();
-                const promptText = `${username}@agent:${projectPath}$`;
+                const promptText = `${username}@agenthost:${projectPath}$`;
                 console.log('loadConfig: Updating header to:', promptText);
                 headerPrompt.textContent = promptText;
             } else if (headerPrompt) {
@@ -71,7 +80,7 @@ async function loadConfig() {
             }
 
             if (projectInfoEl) {
-                projectInfoEl.textContent = `user@agent:${projectPath}`;
+                projectInfoEl.textContent = `user@agenthost:${projectPath}`;
                 // Show the element only if there's content
                 if (projectPath) {
                     projectInfoEl.style.display = 'inline-block';
@@ -146,20 +155,18 @@ async function sendMessage() {
         return;
     }
 
-    // Disable input while sending
-    setInputState(false, 'Sending...');
-
-    // Add user message to chat
+    // Add user message to chat immediately
     addMessage('user', message);
 
     // Clear input
     messageInput.value = '';
 
-    // Add status message
-    const statusMsg = addStatusMessage('Sending message to agent...');
+    // Show AI thinking status immediately - HTTP is fast, waiting for Claude is slow
+    const statusMsg = addStatusMessage('AI is thinking...');
+    setInputState(false, 'AI is thinking...');
 
     try {
-        // Send to Agent API
+        // Send to Agent API - this completes quickly, but waits for full Claude response
         const response = await fetch(`${AGENT_API_URL}/api/chat`, {
             method: 'POST',
             headers: getAuthHeaders(),
@@ -168,10 +175,6 @@ async function sendMessage() {
                 session_id: sessionId
             })
         });
-
-        // Update status and button - agent received the message, now thinking
-        updateStatusMessage(statusMsg, '✓ Agent received message, AI is thinking...');
-        setInputState(false, 'AI is thinking...');
 
         if (response.status === 401) {
             // Auth failed - clear credentials and retry
@@ -420,7 +423,7 @@ function switchSession() {
             <div class="welcome-message">
                 <h2>Select a Session</h2>
                 <p>Choose a session from the dropdown to continue an existing conversation.</p>
-                ${projectPath ? `<p class="project-info">user@agent:${projectPath}</p>` : ''}
+                ${projectPath ? `<p class="project-info">user@agenthost:${projectPath}</p>` : ''}
             </div>
         `;
         updateStats();
@@ -438,7 +441,7 @@ function switchSession() {
         <div class="welcome-message">
             <h2>Session: ${sessionId.substring(0, 8)}...</h2>
             <p>Send a message to resume this conversation.</p>
-            ${projectPath ? `<p class="project-info">user@agent:${projectPath}</p>` : ''}
+            ${projectPath ? `<p class="project-info">user@agenthost:${projectPath}</p>` : ''}
         </div>
     `;
 

@@ -18,6 +18,19 @@ echo "==================================="
 # Try to kill from PID files first
 KILLED=false
 
+# Stop Nginx
+if [ -f logs/nginx.pid ]; then
+    NGINX_PID=$(cat logs/nginx.pid)
+    if ps -p $NGINX_PID > /dev/null 2>&1; then
+        echo "Killing Nginx (PID: $NGINX_PID)..."
+        kill $NGINX_PID 2>/dev/null && KILLED=true
+        rm -f logs/nginx.pid
+    else
+        echo "Nginx PID file exists but process not running"
+        rm -f logs/nginx.pid
+    fi
+fi
+
 if [ -f logs/agent-api.pid ]; then
     AGENT_PID=$(cat logs/agent-api.pid)
     if ps -p $AGENT_PID > /dev/null 2>&1; then
@@ -30,21 +43,27 @@ if [ -f logs/agent-api.pid ]; then
     fi
 fi
 
-if [ -f logs/ui-server.pid ]; then
-    UI_PID=$(cat logs/ui-server.pid)
+if [ -f logs/portal-ui.pid ]; then
+    UI_PID=$(cat logs/portal-ui.pid)
     if ps -p $UI_PID > /dev/null 2>&1; then
-        echo "Killing UI Server (PID: $UI_PID)..."
+        echo "Killing Agent Portal UI (PID: $UI_PID)..."
         kill $UI_PID 2>/dev/null && KILLED=true
-        rm -f logs/ui-server.pid
+        rm -f logs/portal-ui.pid
     else
-        echo "UI Server PID file exists but process not running"
-        rm -f logs/ui-server.pid
+        echo "Agent Portal UI PID file exists but process not running"
+        rm -f logs/portal-ui.pid
     fi
 fi
 
 # Also try to kill by port (in case PID files are missing)
+NGINX_PID=$(lsof -ti:80 2>/dev/null || true)
 AGENT_API_PID=$(lsof -ti:8001 2>/dev/null || true)
 UI_SERVER_PID=$(lsof -ti:8000 2>/dev/null || true)
+
+if [ -n "$NGINX_PID" ]; then
+    echo "Found Nginx on port 80 (PID: $NGINX_PID), killing..."
+    kill $NGINX_PID 2>/dev/null && KILLED=true
+fi
 
 if [ -n "$AGENT_API_PID" ]; then
     echo "Found Agent API on port 8001 (PID: $AGENT_API_PID), killing..."
@@ -52,7 +71,7 @@ if [ -n "$AGENT_API_PID" ]; then
 fi
 
 if [ -n "$UI_SERVER_PID" ]; then
-    echo "Found UI Server on port 8000 (PID: $UI_SERVER_PID), killing..."
+    echo "Found Agent Portal UI on port 8000 (PID: $UI_SERVER_PID), killing..."
     kill $UI_SERVER_PID 2>/dev/null && KILLED=true
 fi
 

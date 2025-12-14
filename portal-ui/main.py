@@ -1,7 +1,5 @@
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from pathlib import Path
 
@@ -9,18 +7,9 @@ from config import config
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="UI Server",
-    description="Serves the web interface for Claude Code remote access",
+    title="Portal UI",
+    description="Static file server for the web interface",
     version="1.0.0"
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 # Get the directory where this file is located
@@ -31,13 +20,7 @@ STATIC_DIR = BASE_DIR / "static"
 @app.get("/health")
 async def health():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "ui-server"}
-
-# Config endpoint
-@app.get("/api/config")
-async def get_config():
-    """Get UI configuration including project path"""
-    return {"project_path": config.PROJECT_PATH}
+    return {"status": "healthy", "service": "portal-ui"}
 
 # Serve index.html at root
 @app.get("/")
@@ -75,8 +58,8 @@ async def serve_css():
     return {"error": "styles.css not found"}, 404
 
 def main():
-    """Start the UI server"""
-    print(f"Starting UI Server...")
+    """Start the portal UI server"""
+    print(f"Starting Portal UI Server...")
     print(f"Server URL: http://{config.UI_SERVER_HOST}:{config.UI_SERVER_PORT}")
     print(f"Agent API URL: http://{config.AGENT_API_HOST}:{config.AGENT_API_PORT}\n")
 

@@ -21,10 +21,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for UI server
+# Enable CORS - allow all origins since Nginx acts as gateway
+# All external requests come through Nginx, internal requests come from portal-ui
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,6 +90,12 @@ async def get_sessions(username: str = Depends(verify_auth)):
         return claude_wrapper.list_sessions()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list sessions: {str(e)}")
+
+# Config endpoint - provides project path to frontend
+@app.get("/api/config")
+async def get_config():
+    """Get configuration including project path (no auth required for basic config)"""
+    return {"project_path": config.PROJECT_PATH}
 
 def main():
     """Start the agent API server"""
