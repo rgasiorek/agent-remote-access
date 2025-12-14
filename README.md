@@ -433,15 +433,83 @@ agent-remote-access/
 
 ### Protected Endpoints (require Basic Auth)
 
-- `POST /api/chat` - Send message to Claude
-  - Request: `{"message": "string", "session_id": "optional-uuid", "conv_id": "default"}`
-  - Response: `{"response": "string", "session_id": "uuid", "cost": float, "turns": int}`
+#### Async Chat API (Recommended - bypasses Cloudflare timeout)
 
-- `POST /api/reset` - Reset conversation
-  - Query param: `conv_id` (default: "default")
-  - Response: `{"message": "...", "conv_id": "..."}`
+The async API uses a polling pattern to work around Cloudflare's ~100s timeout limitation on free tier tunnels. This allows Claude tasks to run indefinitely without HTTP 524 errors.
 
-- `GET /api/sessions` - Get all sessions (debug)
+**Flow:**
+1. Submit task → get `task_id` immediately (< 1s)
+2. Poll status endpoint every 5 seconds
+3. When complete, retrieve result and cleanup
+
+**Endpoints:**
+
+- `POST /api/sessions/{session_id}/chat` - Submit async chat task
+  - Path: `session_id` - Session UUID to resume, or `"new"` for new session
+  - Request: `{"message": "string"}`
+  - Response: `{"task_id": "uuid", "status": "processing"}`
+  - Returns immediately, starts Claude CLI in background
+
+- `GET /api/sessions/{session_id}/tasks/{task_id}` - Poll task status
+  - Path: `session_id` - Session UUID, `task_id` - Task UUID from submit
+  - Response (processing): `{"status": "processing"}`
+  - Response (completed): `{"status": "completed", "result": {...}}`
+  - Response (not found): `{"status": "not_found"}`
+  - Poll every 5s until status is "completed"
+
+- `DELETE /api/sessions/{session_id}/tasks/{task_id}` - Cleanup task
+  - Path: `session_id` - Session UUID, `task_id` - Task UUID
+  - Response: `{"status": "cleaned"}` or `{"status": "not_found"}`
+  - Call after displaying result to user to delete temp file
+
+**Example Flow:**
+```javascript
+// 1. Submit task
+const submit = await fetch('/api/sessions/new/chat', {
+  method: 'POST',
+  body: JSON.stringify({message: 'Help me debug this'})
+});
+const {task_id} = await submit.json();
+
+// 2. Poll every 5s
+const poll = setInterval(async () => {
+  const status = await fetch(`/api/sessions/new/tasks/${task_id}`);
+  const data = await status.json();
+
+  if (data.status === 'completed') {
+    clearInterval(poll);
+    console.log('Result:', data.result);
+
+    // 3. Cleanup
+    await fetch(`/api/sessions/new/tasks/${task_id}`, {method: 'DELETE'});
+  }
+}, 5000);
+```
+
+**Why This Works:**
+- Cloudflare free tier times out HTTP requests after ~100s
+- Each poll completes in < 1s (well under timeout)
+- Tasks can run for hours without 524 errors
+- Simple file-based state in `/tmp` (no subprocess management)
+
+#### Synchronous Chat API (Legacy)
+
+**⚠️ Warning:** Synchronous endpoints will timeout after ~100s when accessed via Cloudflare tunnel. Use async API for long-running tasks.
+
+- `POST /api/chat` - Send message to Claude (blocks until complete)
+  - Request: `{"message": "string", "session_id": "optional-uuid"}`
+  - Response: `{"response": "string", "session_id": "uuid", "cost": float, "turns": int, "success": bool, "error": "string"}`
+  - Only suitable for quick tasks (< 60s)
+
+#### Session Management
+
+- `GET /api/sessions` - List available Claude Code sessions
+  - Response: `{"sessions": [{"session_id": "uuid", "display": "...", "project": "...", "timestamp": 0}]}`
+  - Shows sessions from current project only (filtered by `CLAUDE_PROJECT_PATH`)
+
+- `GET /api/config` - Get configuration
+  - Response: `{"project_path": "/path/to/project"}`
+  - No auth required
 
 ## How It Works
 
