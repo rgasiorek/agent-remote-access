@@ -44,7 +44,15 @@ async def serve_js():
     """Serve JavaScript file"""
     js_path = STATIC_DIR / "app.js"
     if js_path.exists():
-        return FileResponse(js_path, media_type="application/javascript")
+        return FileResponse(
+            js_path,
+            media_type="application/javascript",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     return {"error": "app.js not found"}, 404
 
 # Serve CSS
