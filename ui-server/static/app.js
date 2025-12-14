@@ -15,6 +15,7 @@ const sessionSelect = document.getElementById('session-select');
 const turnCountEl = document.getElementById('turn-count');
 const totalCostEl = document.getElementById('total-cost');
 const projectInfoEl = document.getElementById('project-info');
+const headerPrompt = document.getElementById('header-prompt');
 
 // Get auth credentials from localStorage or prompt
 let authCredentials = localStorage.getItem('auth_credentials');
@@ -53,6 +54,13 @@ async function loadConfig() {
         if (response.ok) {
             const config = await response.json();
             projectPath = config.project_path;
+
+            // Update header prompt with actual project path
+            if (headerPrompt && projectPath) {
+                const username = getCurrentUsername();
+                headerPrompt.textContent = `${username}@agent:${projectPath}$`;
+            }
+
             if (projectInfoEl) {
                 projectInfoEl.textContent = `user@agent:${projectPath}`;
                 // Show the element only if there's content
@@ -66,6 +74,20 @@ async function loadConfig() {
     } catch (error) {
         console.error('Failed to load config:', error);
     }
+}
+
+function getCurrentUsername() {
+    // Try to get username from auth credentials
+    if (authCredentials) {
+        try {
+            const decoded = atob(authCredentials);
+            const username = decoded.split(':')[0];
+            return username || 'user';
+        } catch (e) {
+            return 'user';
+        }
+    }
+    return 'user';
 }
 
 function getAuthHeaders() {
@@ -130,8 +152,9 @@ async function sendMessage() {
             })
         });
 
-        // Update status - agent received the message
-        updateStatusMessage(statusMsg, '✓ Agent received message, thinking...');
+        // Update status and button - agent received the message, now thinking
+        updateStatusMessage(statusMsg, '✓ Agent received message, AI is thinking...');
+        setInputState(false, 'AI is thinking...');
 
         if (response.status === 401) {
             // Auth failed - clear credentials and retry
