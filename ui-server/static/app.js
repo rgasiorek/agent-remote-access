@@ -379,20 +379,21 @@ function switchSession() {
 
     // Switch to selected session
     sessionId = selectedSessionId;
-    localStorage.setItem('claude_session_id', sessionId);
 
     // Clear current chat
     chatContainer.innerHTML = `
         <div class="welcome-message">
-            <h2>Switched to session: ${sessionId.substring(0, 8)}...</h2>
+            <h2>Session: ${sessionId.substring(0, 8)}...</h2>
             <p>Send a message to resume this conversation.</p>
+            <p class="project-info">${projectPath}</p>
         </div>
     `;
-    localStorage.removeItem('chat_history');
 
     // Reset stats (we don't track them across sessions)
     turnCount = 0;
     totalCost = 0;
     updateStats();
     updateSessionInfo();
+    updateSendButtonState();
+    messageInput.focus();
 }
