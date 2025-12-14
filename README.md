@@ -258,9 +258,6 @@ cp .env.example .env
 # Edit .env and set credentials
 ```
 
-### Cloudflare 524 timeout
-Use async API instead of sync. Async polling bypasses timeout.
-
 ### Session dropdown empty
 Sessions are created after first message. Use "new" session initially.
 
