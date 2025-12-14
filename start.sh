@@ -20,19 +20,8 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}Starting Claude Code Remote Access${NC}"
-echo "=================================="
-
-# Check if Nginx is installed
-if ! command -v nginx &> /dev/null; then
-    echo -e "${RED}Error: Nginx is not installed${NC}"
-    echo "Please install Nginx:"
-    echo "  macOS: brew install nginx"
-    echo "  Ubuntu/Debian: sudo apt-get install nginx"
-    echo "  CentOS/RHEL: sudo yum install nginx"
-    exit 1
-fi
-echo -e "${GREEN}✓ Nginx found${NC}"
+echo -e "${GREEN}Starting Claude Code Remote Access (Application Services)${NC}"
+echo "=========================================================="
 
 # Check if .env file exists
 if [ ! -f .env ]; then
@@ -52,19 +41,13 @@ echo -e "${GREEN}✓ Claude authentication found${NC}"
 # Check for running processes
 AGENT_API_PID=$(lsof -ti:8001 2>/dev/null || true)
 UI_SERVER_PID=$(lsof -ti:8000 2>/dev/null || true)
-NGINX_PID=$(lsof -ti:80 2>/dev/null || true)
 
-if [ -n "$AGENT_API_PID" ] || [ -n "$UI_SERVER_PID" ] || [ -n "$NGINX_PID" ]; then
-    echo -e "${YELLOW}Warning: Servers are already running on ports 80, 8000, or 8001${NC}"
-    echo "PIDs found: Nginx=$NGINX_PID, Agent API=$AGENT_API_PID, Portal UI=$UI_SERVER_PID"
+if [ -n "$AGENT_API_PID" ] || [ -n "$UI_SERVER_PID" ]; then
+    echo -e "${YELLOW}Warning: Services are already running on ports 8000 or 8001${NC}"
+    echo "PIDs found: Agent API=$AGENT_API_PID, Portal UI=$UI_SERVER_PID"
     read -p "Do you want to kill them and restart? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if [ -n "$NGINX_PID" ]; then
-            echo "Killing Nginx (PID: $NGINX_PID)..."
-            kill $NGINX_PID 2>/dev/null || true
-            sleep 1
-        fi
         if [ -n "$AGENT_API_PID" ]; then
             echo "Killing Agent API (PID: $AGENT_API_PID)..."
             kill $AGENT_API_PID 2>/dev/null || true
@@ -124,56 +107,20 @@ if ! ps -p $UI_PID > /dev/null; then
     exit 1
 fi
 
-# Start Nginx as API gateway
-echo -e "${GREEN}Starting Nginx API Gateway on port 80...${NC}"
-
-# Create logs directory if it doesn't exist
-mkdir -p logs
-
-# Start Nginx with our custom config
-nginx -c "$SCRIPT_DIR/nginx.conf" -p "$SCRIPT_DIR"
-NGINX_EXIT_CODE=$?
-
-if [ $NGINX_EXIT_CODE -ne 0 ]; then
-    echo -e "${RED}Failed to start Nginx${NC}"
-    echo "Check logs/nginx-error.log for details"
-    echo "Killing backend servers..."
-    kill $AGENT_PID 2>/dev/null || true
-    kill $UI_PID 2>/dev/null || true
-    exit 1
-fi
-
-# Get Nginx PID
-NGINX_PID=$(lsof -ti:80 2>/dev/null || echo "unknown")
-if [ "$NGINX_PID" != "unknown" ]; then
-    echo $NGINX_PID > logs/nginx.pid
-fi
-
-sleep 1
-
 echo ""
-echo -e "${GREEN}✓ All services started successfully!${NC}"
-echo "=================================="
-echo -e "Main Application: ${GREEN}http://localhost${NC} ${YELLOW}(or http://127.0.0.1)${NC}"
-echo ""
-echo "Backend Services (internal):"
+echo -e "${GREEN}✓ Application services started successfully!${NC}"
+echo "=============================================="
+echo "Services:"
 echo "  Portal UI:  http://localhost:8000"
 echo "  Agent API:  http://localhost:8001"
 echo ""
 echo "PIDs:"
-echo "  Nginx Gateway: $NGINX_PID (saved to logs/nginx.pid)"
 echo "  Agent API: $AGENT_PID (saved to logs/agent-api.pid)"
 echo "  Portal UI: $UI_PID (saved to logs/portal-ui.pid)"
 echo ""
-echo "To view logs:"
-echo "  tail -f logs/nginx-access.log"
-echo "  tail -f logs/nginx-error.log"
+echo "Logs:"
 echo "  tail -f logs/agent-api.log"
 echo "  tail -f logs/portal-ui.log"
 echo ""
-echo "To stop all services:"
-echo "  ./stop.sh"
-echo ""
-echo -e "${YELLOW}Note: All requests should go to http://localhost (port 80)${NC}"
-echo -e "${YELLOW}Nginx will route /api/* to agent-api and everything else to portal-ui${NC}"
+echo "To stop: ./stop.sh"
 echo ""

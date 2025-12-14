@@ -15,59 +15,51 @@ This project creates a **remote access bridge** to interact with Claude Code CLI
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ MOBILE DEVICE                                                       │
-│                                                                     │
-│  Browser → Chat UI (HTML/JS/CSS)                                   │
-│            ↓                                                        │
-│  HTTPS Requests to API:                                            │
-│    • POST /api/chat {"message": "...", "conv_id": "default"}       │
-│    • GET  /api/sessions (list all conversations)                   │
-│    • POST /api/reset (start new conversation)                      │
+│ MOBILE DEVICE / BROWSER                                             │
+│  HTTPS Requests: POST /api/chat, GET /api/sessions, etc.           │
 └─────────────────────────────────────────────────────────────────────┘
                              ↓
                     HTTPS (Encrypted)
                              ↓
 ┌─────────────────────────────────────────────────────────────────────┐
-│ CLOUDFLARE TUNNEL (https://remote-agent.yourdomain.com)            │
-│  • Provides persistent HTTPS URL on your domain                     │
-│  • Handles SSL/TLS termination                                      │
-│  • Global CDN network for low latency                               │
-│  • Forwards to localhost:8000                                       │
+│ CLOUDFLARE TUNNEL (https://yourdomain.com)                         │
+│  • SSL/TLS termination                                              │
+│  • Forwards to localhost:80                                         │
 └─────────────────────────────────────────────────────────────────────┘
                              ↓
 ┌─────────────────────────────────────────────────────────────────────┐
-│ YOUR LAPTOP (localhost:8000)                                        │
+│ YOUR LAPTOP                                                         │
 │                                                                     │
 │ ┌─────────────────────────────────────────────────────────────┐   │
-│ │ FASTAPI SERVER (Python)                                       │   │
-│ │                                                               │   │
-│ │  1. Serves Frontend (/, /app.js, /styles.css)                │   │
-│ │  2. API Endpoints (/api/*)                                    │   │
-│ │  3. HTTP Basic Auth Middleware                                │   │
-│ │  4. Session Manager (tracks conversation IDs → session UUIDs) │   │
-│ │  5. Claude CLI Wrapper (subprocess executor)                  │   │
+│ │ NGINX (Port 80) - Internet-facing entry point                │   │
+│ │  • Routes /api/* → Agent API (localhost:8001)                 │   │
+│ │  • Routes /*     → Portal UI (localhost:8000)                 │   │
 │ └─────────────────────────────────────────────────────────────┘   │
-│                             ↓                                       │
-│              Spawns subprocess for each request:                    │
-│              `claude -p "message" --resume <UUID> --output-format json` │
-│                             ↓                                       │
-│ ┌─────────────────────────────────────────────────────────────┐   │
-│ │ CLAUDE CODE CLI (Headless Mode)                              │   │
-│ │  • Executes in project directory (CLAUDE_PROJECT_PATH)        │   │
-│ │  • Has access to local files, git, tools                      │   │
-│ │  • Returns JSON response with result + session UUID           │   │
-│ │  • Session stored in ~/.claude/ for continuity                │   │
-│ └─────────────────────────────────────────────────────────────┘   │
+│          ↓                                  ↓                       │
+│ ┌──────────────────────┐      ┌──────────────────────────────┐    │
+│ │ Portal UI (Port 8000)│      │ Agent API (Port 8001)        │    │
+│ │ Internal service     │      │ Internal service             │    │
+│ │ • Serves static files│      │ • HTTP Basic Auth            │    │
+│ │ • HTML/JS/CSS        │      │ • Session manager            │    │
+│ └──────────────────────┘      │ • Claude CLI wrapper         │    │
+│                               └──────────────────────────────┘    │
+│                                          ↓                         │
+│                       Spawns: claude -p "..." --resume <UUID>     │
+│                                          ↓                         │
+│                       ┌────────────────────────────┐               │
+│                       │ CLAUDE CODE CLI            │               │
+│                       │ • Executes in project dir  │               │
+│                       │ • Returns JSON response    │               │
+│                       └────────────────────────────┘               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Points:
 
-- **FastAPI** serves BOTH the frontend UI AND the HTTP API endpoints
+- **Nginx (port 80)** is the only internet-facing service
+- **Portal UI (port 8000)** and **Agent API (port 8001)** are internal services behind Nginx
 - Each API request spawns a `claude -p` subprocess (headless mode)
-- The FastAPI server acts as a **stateless proxy** - it doesn't maintain conversation context
-- **Claude Code itself** maintains conversation context via session UUIDs (stored in `~/.claude/`)
-- The **session manager** just tracks which UUID belongs to which conversation ID
+- **Claude Code** maintains conversation context via session UUIDs (stored in `~/.claude/`)
 - Multiple conversations can run simultaneously (each gets its own UUID)
 
 ## Features
@@ -84,6 +76,7 @@ This project creates a **remote access bridge** to interact with Claude Code CLI
 ## Prerequisites
 
 - Python 3.8 or higher
+- **Nginx** - Reverse proxy for routing requests
 - Claude Code CLI installed (`npm install -g @anthropic-ai/claude-code`)
 - **Claude CLI authenticated** - Run `claude login` in your terminal before starting
 - Cloudflare account (free tier works great)
@@ -154,7 +147,20 @@ python3 -m venv venv
 pip install -r requirements.txt
 ```
 
-### 2. Install Cloudflare Tunnel
+### 2. Install Nginx
+
+```bash
+# macOS (with Homebrew)
+brew install nginx
+
+# Ubuntu/Debian
+sudo apt-get install nginx
+
+# CentOS/RHEL
+sudo yum install nginx
+```
+
+### 3. Install Cloudflare Tunnel
 
 ```bash
 # macOS (with Homebrew)
@@ -199,7 +205,7 @@ Or use Cloudflare's free subdomain:
 cloudflared tunnel route dns agent-remote-access <TUNNEL-ID>.cfargotunnel.com
 ```
 
-### 3. Authenticate with Claude CLI
+### 4. Authenticate with Claude CLI
 
 **IMPORTANT:** You must authenticate with Claude Code CLI before starting the servers.
 
@@ -210,7 +216,7 @@ claude login
 
 This creates `~/.claude.json` with your authentication credentials. The agent-remote-access system will use this session for all Claude API calls.
 
-### 4. Configure Environment
+### 5. Configure Environment
 
 ```bash
 # Copy environment template
@@ -258,14 +264,27 @@ The server will be accessible on `http://localhost:8000` (from host)
 #### Without Docker (Local Python)
 
 ```bash
-# Activate virtual environment (if not already active)
-. venv/bin/activate
+# Start application services
+./start.sh
 
-# Start the server
-python -m server.main
+# In another terminal, start Nginx (infrastructure)
+nginx -c $(pwd)/nginx.conf -p $(pwd)
+
+# Or start everything together
+./start_all.sh
 ```
 
-The server will start on `http://127.0.0.1:8000`
+The application services:
+- Portal UI (port 8000)
+- Agent API (port 8001)
+
+With Nginx running (port 80), access at: `http://localhost`
+
+To stop:
+```bash
+./stop.sh        # Stop application services
+./stop_all.sh    # Stop everything including Nginx
+```
 
 ### Exposing via Cloudflare Tunnel
 
@@ -277,7 +296,7 @@ You have two options for exposing your local server:
 
 ```bash
 # Start a quick tunnel - gives you a random URL instantly
-cloudflared tunnel --url http://localhost:8000
+cloudflared tunnel --url http://localhost
 ```
 
 This will output something like:
@@ -314,7 +333,7 @@ credentials-file: /Users/yourname/.cloudflared/<TUNNEL-ID>.json
 
 ingress:
   - hostname: remote-agent.yourdomain.com
-    service: http://localhost:8000
+    service: http://localhost
   - service: http_status:404
 ```
 

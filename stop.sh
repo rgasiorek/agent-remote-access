@@ -12,24 +12,11 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}Stopping Claude Code Remote Access${NC}"
-echo "==================================="
+echo -e "${YELLOW}Stopping Claude Code Remote Access (Application Services)${NC}"
+echo "=========================================================="
 
 # Try to kill from PID files first
 KILLED=false
-
-# Stop Nginx
-if [ -f logs/nginx.pid ]; then
-    NGINX_PID=$(cat logs/nginx.pid)
-    if ps -p $NGINX_PID > /dev/null 2>&1; then
-        echo "Killing Nginx (PID: $NGINX_PID)..."
-        kill $NGINX_PID 2>/dev/null && KILLED=true
-        rm -f logs/nginx.pid
-    else
-        echo "Nginx PID file exists but process not running"
-        rm -f logs/nginx.pid
-    fi
-fi
 
 if [ -f logs/agent-api.pid ]; then
     AGENT_PID=$(cat logs/agent-api.pid)
@@ -56,14 +43,8 @@ if [ -f logs/portal-ui.pid ]; then
 fi
 
 # Also try to kill by port (in case PID files are missing)
-NGINX_PID=$(lsof -ti:80 2>/dev/null || true)
 AGENT_API_PID=$(lsof -ti:8001 2>/dev/null || true)
 UI_SERVER_PID=$(lsof -ti:8000 2>/dev/null || true)
-
-if [ -n "$NGINX_PID" ]; then
-    echo "Found Nginx on port 80 (PID: $NGINX_PID), killing..."
-    kill $NGINX_PID 2>/dev/null && KILLED=true
-fi
 
 if [ -n "$AGENT_API_PID" ]; then
     echo "Found Agent API on port 8001 (PID: $AGENT_API_PID), killing..."
@@ -78,16 +59,9 @@ fi
 # Wait a moment for processes to die
 if [ "$KILLED" = true ]; then
     sleep 1
-    echo -e "${GREEN}✓ Servers stopped successfully${NC}"
+    echo -e "${GREEN}✓ Services stopped${NC}"
 else
-    echo -e "${YELLOW}No running servers found${NC}"
-fi
-
-# Stop Cloudflare tunnel if running
-if pgrep -f "cloudflared tunnel" >/dev/null 2>&1; then
-    echo "Stopping Cloudflare tunnel..."
-    pkill -f "cloudflared tunnel"
-    echo -e "${GREEN}✓ Cloudflare tunnel stopped${NC}"
+    echo -e "${YELLOW}No running services found${NC}"
 fi
 
 echo ""
