@@ -172,4 +172,5 @@ class TestClaudeWrapper:
             wrapper = ClaudeWrapper()
             result = wrapper.list_sessions()
 
-        assert result == {'sessions': []}
+        assert result['sessions'] == []
+        assert 'hint' in result  # Should include helpful hint when no sessions found
