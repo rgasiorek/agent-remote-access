@@ -24,3 +24,4 @@ INFO:     127.0.0.1:58082 - "GET /styles.css HTTP/1.1" 200 OK
 INFO:     127.0.0.1:58085 - "GET /api/config HTTP/1.1" 200 OK
 INFO:     127.0.0.1:58082 - "GET / HTTP/1.1" 200 OK
 INFO:     127.0.0.1:58085 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58251 - "GET /api/config HTTP/1.1" 200 OK

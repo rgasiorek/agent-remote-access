@@ -49,20 +49,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadConfig() {
+    console.log('loadConfig: Starting config fetch from', `${UI_API_URL}/api/config`);
     try {
         const response = await fetch(`${UI_API_URL}/api/config`);
+        console.log('loadConfig: Fetch response status:', response.status, response.ok);
+
         if (response.ok) {
             const config = await response.json();
+            console.log('loadConfig: Config received:', config);
             projectPath = config.project_path;
 
             // Update header prompt with actual project path
             if (headerPrompt && projectPath) {
                 const username = getCurrentUsername();
                 const promptText = `${username}@agent:${projectPath}$`;
-                console.log('Updating header to:', promptText);
+                console.log('loadConfig: Updating header to:', promptText);
                 headerPrompt.textContent = promptText;
             } else if (headerPrompt) {
-                console.error('No project path received');
+                console.error('loadConfig: No project path in config');
                 headerPrompt.textContent = 'Error: No project path';
             }
 
@@ -76,14 +80,15 @@ async function loadConfig() {
                 }
             }
         } else {
+            console.error('loadConfig: Bad response status:', response.status);
             if (headerPrompt) {
-                headerPrompt.textContent = 'Error: Failed to load config';
+                headerPrompt.textContent = `Error: HTTP ${response.status}`;
             }
         }
     } catch (error) {
-        console.error('Failed to load config:', error);
+        console.error('loadConfig: Fetch exception:', error, error.message);
         if (headerPrompt) {
-            headerPrompt.textContent = 'Error: Config load failed';
+            headerPrompt.textContent = `Error: ${error.message || 'Config load failed'}`;
         }
     }
 }
