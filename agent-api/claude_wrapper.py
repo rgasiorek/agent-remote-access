@@ -158,7 +158,10 @@ class ClaudeWrapper:
         history_file = Path.home() / '.claude' / 'history.jsonl'
 
         if not history_file.exists():
-            return {'sessions': []}
+            return {
+                'sessions': [],
+                'hint': f'No Claude Code sessions found. Start a session by running "claude" in {self.project_path} first.'
+            }
 
         sessions = {}
         try:
@@ -183,7 +186,14 @@ class ClaudeWrapper:
 
             # Sort by timestamp, most recent first
             sorted_sessions = sorted(sessions.values(), key=lambda x: x['timestamp'], reverse=True)
-            return {'sessions': sorted_sessions[:20]}
+
+            result = {'sessions': sorted_sessions[:20]}
+
+            # Add hint if no sessions found for this project
+            if not sorted_sessions:
+                result['hint'] = f'No Claude Code sessions found for project: {self.project_path}. Start a session by running "claude" in this directory first, or create a new session via the async chat API.'
+
+            return result
 
         except Exception as e:
             return {'error': str(e), 'sessions': []}

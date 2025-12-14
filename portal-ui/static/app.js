@@ -448,6 +448,14 @@ async function loadSessions() {
         // Rebuild dropdown - start empty
         sessionSelect.innerHTML = '<option value="">Select a session...</option>';
 
+        if (sessions.length === 0 && data.hint) {
+            // Show hint as disabled option when no sessions found
+            const hintOption = document.createElement('option');
+            hintOption.disabled = true;
+            hintOption.textContent = `💡 ${data.hint}`;
+            sessionSelect.appendChild(hintOption);
+        }
+
         sessions.forEach(session => {
             const option = document.createElement('option');
             option.value = session.session_id;
