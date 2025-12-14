@@ -41,7 +41,21 @@ fi
 echo ""
 ./stop.sh
 
-# Stop Cloudflare tunnel if running
+# Stop Cloudflare tunnel
+if [ -f logs/cloudflared.pid ]; then
+    TUNNEL_PID=$(cat logs/cloudflared.pid)
+    if ps -p $TUNNEL_PID > /dev/null 2>&1; then
+        echo ""
+        echo "Killing Cloudflare tunnel (PID: $TUNNEL_PID)..."
+        kill $TUNNEL_PID 2>/dev/null && KILLED=true
+        rm -f logs/cloudflared.pid
+    else
+        echo "Cloudflare tunnel PID file exists but process not running"
+        rm -f logs/cloudflared.pid
+    fi
+fi
+
+# Also try to kill by process name (in case PID file is missing)
 if pgrep -f "cloudflared tunnel" >/dev/null 2>&1; then
     echo ""
     echo "Stopping Cloudflare tunnel..."

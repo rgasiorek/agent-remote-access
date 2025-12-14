@@ -26,6 +26,17 @@ if ! command -v nginx &> /dev/null; then
 fi
 echo -e "${GREEN}✓ Nginx found${NC}"
 
+# Check if cloudflared is installed
+if ! command -v cloudflared &> /dev/null; then
+    echo -e "${YELLOW}Warning: cloudflared is not installed${NC}"
+    echo "Cloudflare tunnel will not be started"
+    echo "Install with: brew install cloudflared"
+    SKIP_TUNNEL=true
+else
+    echo -e "${GREEN}✓ cloudflared found${NC}"
+    SKIP_TUNNEL=false
+fi
+
 # Start application services
 echo ""
 echo "Starting application services..."
@@ -65,21 +76,61 @@ fi
 
 sleep 1
 
+# Start Cloudflare tunnel
+if [ "$SKIP_TUNNEL" = false ]; then
+    echo ""
+    echo -e "${GREEN}Starting Cloudflare Tunnel...${NC}"
+
+    # Check if tunnel is already running
+    if pgrep -f "cloudflared tunnel" >/dev/null 2>&1; then
+        echo -e "${YELLOW}Cloudflare tunnel is already running${NC}"
+    else
+        # Start tunnel in background and capture output
+        cloudflared tunnel --url http://localhost > logs/cloudflared.log 2>&1 &
+        TUNNEL_PID=$!
+        echo $TUNNEL_PID > logs/cloudflared.pid
+
+        # Wait for tunnel to start and get URL
+        echo "Waiting for tunnel to connect..."
+        sleep 5
+
+        # Extract tunnel URL from logs
+        TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' logs/cloudflared.log | head -1)
+
+        if [ -n "$TUNNEL_URL" ]; then
+            echo -e "${GREEN}✓ Cloudflare tunnel started${NC}"
+            echo -e "Tunnel URL: ${GREEN}${TUNNEL_URL}${NC}"
+        else
+            echo -e "${YELLOW}Tunnel started but URL not yet available${NC}"
+            echo "Check logs/cloudflared.log for tunnel URL"
+        fi
+    fi
+fi
+
 echo ""
 echo -e "${GREEN}✓ All services started successfully!${NC}"
 echo "======================================="
-echo -e "Access application at: ${GREEN}http://localhost${NC}"
+echo -e "Local access:  ${GREEN}http://localhost${NC}"
+if [ "$SKIP_TUNNEL" = false ] && [ -n "$TUNNEL_URL" ]; then
+    echo -e "Remote access: ${GREEN}${TUNNEL_URL}${NC}"
+fi
 echo ""
 echo "Services running:"
 echo "  Nginx Gateway:  port 80"
 echo "  Portal UI:      port 8000 (internal)"
 echo "  Agent API:      port 8001 (internal)"
+if [ "$SKIP_TUNNEL" = false ]; then
+    echo "  Cloudflare Tunnel: $TUNNEL_URL"
+fi
 echo ""
 echo "To view logs:"
 echo "  tail -f logs/nginx-access.log"
 echo "  tail -f logs/nginx-error.log"
 echo "  tail -f logs/portal-ui.log"
 echo "  tail -f logs/agent-api.log"
+if [ "$SKIP_TUNNEL" = false ]; then
+    echo "  tail -f logs/cloudflared.log"
+fi
 echo ""
 echo "To stop all services:"
 echo "  ./stop_all.sh"
