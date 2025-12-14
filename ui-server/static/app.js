@@ -367,11 +367,13 @@ function switchSession() {
         chatContainer.innerHTML = `
             <div class="welcome-message">
                 <h2>Select a Session</h2>
-                <p>Choose a session from the dropdown above to continue, or send a message to start a new one.</p>
+                <p>Choose a session from the dropdown to continue an existing conversation.</p>
+                <p class="project-info" id="project-info">${projectPath}</p>
             </div>
         `;
         updateStats();
         updateSessionInfo();
+        updateSendButtonState();
         return;
     }
 
