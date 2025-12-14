@@ -6,12 +6,11 @@
 
 body {
     font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
-    background: #000000;
-    color: #00ff00;
+    background: #1c1c1c;
+    color: #0087af;
     overflow: hidden;
-    -webkit-font-smoothing: none;
+    -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    text-shadow: 0 0 2px #00ff0044;
 }
 
 .container {
@@ -19,13 +18,13 @@ body {
     flex-direction: column;
     height: 100vh;
     max-width: 100vw;
-    background: #000000;
+    background: #1c1c1c;
 }
 
 /* Header - Terminal Style */
 header {
-    background: #0a0a0a;
-    border-bottom: 1px solid #00ff00;
+    background: #262626;
+    border-bottom: 1px solid #585858;
     padding: 8px 12px;
     flex-shrink: 0;
     font-size: 13px;
@@ -39,7 +38,7 @@ header {
 }
 
 .prompt {
-    color: #00ff00;
+    color: #5fd700;
     font-weight: bold;
     font-size: 13px;
     white-space: nowrap;
@@ -48,14 +47,14 @@ header {
 .title-text h1 {
     font-size: 14px;
     font-weight: bold;
-    color: #00ff00;
+    color: #0087af;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .subtitle {
     font-size: 11px;
-    color: #00aa00;
+    color: #8787af;
     font-weight: normal;
 }
 
@@ -69,26 +68,26 @@ header {
 }
 
 .info-badge {
-    color: #00ff00;
+    color: #0087af;
     padding: 2px 8px;
-    border: 1px solid #00ff00;
-    background: #001100;
+    border: 1px solid #585858;
+    background: #262626;
 }
 
 .info-badge.active {
-    background: #003300;
-    color: #00ff00;
+    background: #303030;
+    color: #00afff;
     font-weight: bold;
 }
 
 .stats {
     display: flex;
     gap: 16px;
-    color: #00aa00;
+    color: #8787af;
 }
 
 .stats strong {
-    color: #00ff00;
+    color: #0087af;
 }
 
 /* Chat Container - Terminal Output */
@@ -96,7 +95,7 @@ header {
     flex: 1;
     overflow-y: auto;
     padding: 12px;
-    background: #000000;
+    background: #1c1c1c;
     font-size: 13px;
     line-height: 1.6;
 }
@@ -106,22 +105,22 @@ header {
 }
 
 .chat-container::-webkit-scrollbar-track {
-    background: #000000;
+    background: #1c1c1c;
 }
 
 .chat-container::-webkit-scrollbar-thumb {
-    background: #00ff00;
-    border: 2px solid #000000;
+    background: #585858;
+    border: 2px solid #1c1c1c;
 }
 
 /* Welcome Message */
 .welcome-message {
-    color: #00aa00;
+    color: #8787af;
     padding: 20px 12px;
 }
 
 .welcome-message h2 {
-    color: #00ff00;
+    color: #0087af;
     margin-bottom: 12px;
     font-size: 16px;
     font-weight: bold;
@@ -133,10 +132,10 @@ header {
 }
 
 .project-info {
-    background: #001100;
-    color: #00ff00;
+    background: #262626;
+    color: #0087af;
     padding: 6px 12px;
-    border: 1px solid #00ff00;
+    border: 1px solid #585858;
     display: inline-block;
     margin-top: 12px;
     font-size: 11px;
@@ -162,7 +161,7 @@ header {
 }
 
 .message-user .message-role {
-    color: #00ffff;
+    color: #00afff;
 }
 
 .message-user .message-role::before {
@@ -170,7 +169,7 @@ header {
 }
 
 .message-assistant .message-role {
-    color: #00ff00;
+    color: #5fd700;
 }
 
 .message-assistant .message-role::before {
@@ -178,7 +177,7 @@ header {
 }
 
 .message-error .message-role {
-    color: #ff0000;
+    color: #d7af00;
 }
 
 .message-error .message-role::before {
@@ -191,22 +190,22 @@ header {
     white-space: pre-wrap;
     word-wrap: break-word;
     font-size: 13px;
-    border-left: 2px solid #00ff00;
+    border-left: 2px solid #585858;
 }
 
 .message-user .message-content {
-    border-left-color: #00ffff;
-    color: #00ffff;
+    border-left-color: #00afff;
+    color: #00afff;
 }
 
 .message-assistant .message-content {
-    border-left-color: #00ff00;
-    color: #00ff00;
+    border-left-color: #5fd700;
+    color: #5fd700;
 }
 
 .message-error .message-content {
-    border-left-color: #ff0000;
-    color: #ff0000;
+    border-left-color: #d7af00;
+    color: #d7af00;
 }
 
 /* Status Messages */
@@ -215,25 +214,25 @@ header {
     margin: 8px 0;
     font-size: 12px;
     font-style: italic;
-    border: 1px dashed #00ff00;
+    border: 1px dashed #585858;
     animation: terminalBlink 0.1s;
 }
 
 .status-info {
-    color: #00ff00;
-    background: #001100;
+    color: #5fd700;
+    background: #262626;
 }
 
 .status-error {
-    color: #ff0000;
-    background: #110000;
-    border-color: #ff0000;
+    color: #d7af00;
+    background: #262626;
+    border-color: #d7af00;
 }
 
 /* Input Container - Terminal Input */
 .input-container {
-    background: #0a0a0a;
-    border-top: 1px solid #00ff00;
+    background: #262626;
+    border-top: 1px solid #585858;
     padding: 10px 12px;
     flex-shrink: 0;
 }
@@ -246,9 +245,9 @@ header {
 
 .session-selector select {
     flex: 1;
-    background: #000000;
-    border: 1px solid #00ff00;
-    color: #00ff00;
+    background: #1c1c1c;
+    border: 1px solid #585858;
+    color: #0087af;
     padding: 8px 10px;
     font-family: 'Courier New', monospace;
     font-size: 12px;
@@ -259,13 +258,13 @@ header {
 }
 
 .session-selector select:focus {
-    background: #001100;
-    box-shadow: 0 0 5px #00ff00;
+    background: #262626;
+    box-shadow: 0 0 5px #0087af;
 }
 
 .session-selector select option {
-    background: #000000;
-    color: #00ff00;
+    background: #1c1c1c;
+    color: #0087af;
 }
 
 .message-input-group {
@@ -276,9 +275,9 @@ header {
 
 #message-input {
     flex: 1;
-    background: #000000;
-    border: 1px solid #00ff00;
-    color: #00ff00;
+    background: #1c1c1c;
+    border: 1px solid #585858;
+    color: #0087af;
     padding: 10px;
     font-family: 'Courier New', monospace;
     font-size: 13px;
@@ -289,8 +288,8 @@ header {
 }
 
 #message-input:focus {
-    background: #001100;
-    box-shadow: 0 0 5px #00ff00;
+    background: #262626;
+    box-shadow: 0 0 5px #0087af;
 }
 
 #message-input:disabled {
@@ -299,15 +298,15 @@ header {
 }
 
 #message-input::placeholder {
-    color: #006600;
+    color: #585858;
 }
 
 /* Buttons - Terminal Style */
 .btn-primary, .btn-secondary {
     padding: 10px 18px;
-    border: 1px solid #00ff00;
-    background: #001100;
-    color: #00ff00;
+    border: 1px solid #585858;
+    background: #262626;
+    color: #0087af;
     font-family: 'Courier New', monospace;
     font-size: 13px;
     font-weight: bold;
@@ -323,19 +322,19 @@ header {
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: #003300;
-    box-shadow: 0 0 8px #00ff00;
+    background: #303030;
+    box-shadow: 0 0 8px #0087af;
 }
 
 .btn-primary:active:not(:disabled) {
-    background: #005500;
+    background: #3a3a3a;
 }
 
 .btn-primary:disabled {
     opacity: 0.3;
     cursor: not-allowed;
-    border-color: #006600;
-    color: #006600;
+    border-color: #303030;
+    color: #585858;
 }
 
 .btn-icon {
@@ -344,15 +343,15 @@ header {
 }
 
 .btn-secondary {
-    background: #000000;
-    border-color: #00aa00;
-    color: #00aa00;
+    background: #1c1c1c;
+    border-color: #585858;
+    color: #8787af;
 }
 
 .btn-secondary:hover {
-    background: #002200;
-    border-color: #00ff00;
-    color: #00ff00;
+    background: #262626;
+    border-color: #0087af;
+    color: #0087af;
 }
 
 /* Mobile Optimizations */
@@ -445,41 +444,4 @@ header {
     }
 }
 
-/* CRT Effect (optional - subtle) */
-@media (min-width: 769px) {
-    body::after {
-        content: "";
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: repeating-linear-gradient(
-            0deg,
-            rgba(0, 0, 0, 0.15),
-            rgba(0, 0, 0, 0.15) 1px,
-            transparent 1px,
-            transparent 2px
-        );
-        pointer-events: none;
-        z-index: 1000;
-    }
-}
-
-/* Terminal cursor blink animation */
-.message-user .message-role::after,
-.message-assistant .message-role::after {
-    content: '';
-    display: inline-block;
-    width: 8px;
-    height: 14px;
-    background: #00ff00;
-    margin-left: 4px;
-    animation: cursorBlink 1s infinite;
-    opacity: 0;
-}
-
-@keyframes cursorBlink {
-    0%, 49% { opacity: 0; }
-    50%, 100% { opacity: 1; }
-}
+/* Removed CRT effect and cursor blink for cleaner look */
