@@ -1,750 +1,393 @@
 # Claude Code Remote Access
 
-A system for remotely accessing Claude Code CLI sessions from mobile devices via HTTPS.
+Remote HTTPS access to Claude Code CLI from mobile devices. Submit tasks via REST API, bypass Cloudflare timeouts with async polling.
 
-## Overview
+## Quick Start
 
-This project creates a **remote access bridge** to interact with Claude Code CLI sessions from your mobile device. It's built with FastAPI and provides:
+```bash
+# 1. Authenticate Claude CLI
+claude login
 
-1. **Web-based chat interface** - Mobile-friendly UI served by FastAPI
-2. **HTTP API endpoints** - RESTful API for sending messages to Claude Code
-3. **Session management** - Tracks multiple conversations with context persistence
-4. **Secure tunnel** - Cloudflare Tunnel exposes local server to internet via HTTPS
+# 2. Clone and configure
+git clone https://github.com/rgasiorek/agent-remote-access.git
+cd agent-remote-access
+cp .env.example .env
+# Edit .env: set AUTH_USERNAME, AUTH_PASSWORD, CLAUDE_PROJECT_PATH
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Start services
+./start_all.sh
+
+# 5. Expose via Cloudflare (quick test - URL changes on restart)
+cloudflared tunnel --url http://localhost
+```
+
+Access from mobile: `https://your-tunnel-url.trycloudflare.com`
+
+## REST API
+
+### Async Chat API (Recommended)
+
+Polling pattern that bypasses Cloudflare's ~100s timeout. Tasks can run indefinitely.
+
+#### Submit Task
+```http
+POST /api/sessions/{session_id}/chat
+```
+- `session_id`: UUID to resume, or `"new"` for new session
+- Body: `{"message": "your task"}`
+- Response: `{"task_id": "uuid", "status": "processing"}`
+- Returns immediately (< 1s)
+
+#### Poll Status
+```http
+GET /api/sessions/{session_id}/tasks/{task_id}
+```
+- Response (processing): `{"status": "processing"}`
+- Response (completed): `{"status": "completed", "result": {...}}`
+- Poll every 5 seconds until completed
+
+#### Cleanup
+```http
+DELETE /api/sessions/{session_id}/tasks/{task_id}
+```
+- Response: `{"status": "cleaned"}`
+- Call after displaying result to delete temp file
+
+#### Example Flow
+```javascript
+// 1. Submit
+const {task_id} = await fetch('/api/sessions/new/chat', {
+  method: 'POST',
+  headers: {'Authorization': 'Basic ' + btoa('user:pass')},
+  body: JSON.stringify({message: 'Debug this code'})
+}).then(r => r.json());
+
+// 2. Poll every 5s
+const poll = setInterval(async () => {
+  const {status, result} = await fetch(`/api/sessions/new/tasks/${task_id}`, {
+    headers: {'Authorization': 'Basic ' + btoa('user:pass')}
+  }).then(r => r.json());
+
+  if (status === 'completed') {
+    clearInterval(poll);
+    console.log(result);
+
+    // 3. Cleanup
+    fetch(`/api/sessions/new/tasks/${task_id}`, {
+      method: 'DELETE',
+      headers: {'Authorization': 'Basic ' + btoa('user:pass')}
+    });
+  }
+}, 5000);
+```
+
+**Why polling works:**
+- Cloudflare free tier: ~100s timeout per request
+- Each poll: < 1s (well under limit)
+- Total task duration: unlimited
+
+### Session Management
+
+#### List Sessions
+```http
+GET /api/sessions
+```
+Response:
+```json
+{
+  "sessions": [
+    {
+      "session_id": "550e8400-...",
+      "display": "First message preview",
+      "project": "/path/to/project",
+      "timestamp": 1234567890
+    }
+  ]
+}
+```
+- Filtered by current `CLAUDE_PROJECT_PATH`
+- Sorted by timestamp (newest first)
+- Limited to 20 sessions
+
+#### Get Config
+```http
+GET /api/config
+```
+Response: `{"project_path": "/path/to/project"}`
+
+### Authentication
+
+All endpoints (except `/health`, `/api/config`) require HTTP Basic Auth:
+```http
+Authorization: Basic base64(username:password)
+```
+Credentials configured in `.env` file.
+
+### Legacy Sync API
+
+**⚠️ Warning:** Blocks until complete, times out after ~100s via Cloudflare.
+
+```http
+POST /api/chat
+Body: {"message": "...", "session_id": "optional-uuid"}
+Response: {"response": "...", "session_id": "...", "cost": 0.05, "turns": 2, "success": true}
+```
+
+Only use for quick tasks (< 60s).
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│ MOBILE DEVICE / BROWSER                                             │
-│  HTTPS Requests: POST /api/chat, GET /api/sessions, etc.           │
-└─────────────────────────────────────────────────────────────────────┘
-                             ↓
-                    HTTPS (Encrypted)
-                             ↓
-┌─────────────────────────────────────────────────────────────────────┐
-│ CLOUDFLARE TUNNEL (https://yourdomain.com)                         │
-│  • SSL/TLS termination                                              │
-│  • Forwards to localhost:80                                         │
-└─────────────────────────────────────────────────────────────────────┘
-                             ↓
-┌─────────────────────────────────────────────────────────────────────┐
-│ YOUR LAPTOP                                                         │
-│                                                                     │
-│ ┌─────────────────────────────────────────────────────────────┐   │
-│ │ NGINX (Port 80) - Internet-facing entry point                │   │
-│ │  • Routes /api/* → Agent API (localhost:8001)                 │   │
-│ │  • Routes /*     → Portal UI (localhost:8000)                 │   │
-│ └─────────────────────────────────────────────────────────────┘   │
-│          ↓                                  ↓                       │
-│ ┌──────────────────────┐      ┌──────────────────────────────┐    │
-│ │ Portal UI (Port 8000)│      │ Agent API (Port 8001)        │    │
-│ │ Internal service     │      │ Internal service             │    │
-│ │ • Serves static files│      │ • HTTP Basic Auth            │    │
-│ │ • HTML/JS/CSS        │      │ • Session manager            │    │
-│ └──────────────────────┘      │ • Claude CLI wrapper         │    │
-│                               └──────────────────────────────┘    │
-│                                          ↓                         │
-│                       Spawns: claude -p "..." --resume <UUID>     │
-│                                          ↓                         │
-│                       ┌────────────────────────────┐               │
-│                       │ CLAUDE CODE CLI            │               │
-│                       │ • Executes in project dir  │               │
-│                       │ • Returns JSON response    │               │
-│                       └────────────────────────────┘               │
-└─────────────────────────────────────────────────────────────────────┘
+Mobile Browser
+    ↓ HTTPS
+Cloudflare Tunnel
+    ↓ HTTP
+Nginx (port 80)
+    ├─→ /api/*  → Agent API (port 8001)
+    └─→ /*      → Portal UI (port 8000)
+                      ↓
+            Claude Code CLI (subprocess)
 ```
 
-### Key Points:
+**Components:**
 
-- **Nginx (port 80)** is the only internet-facing service
-- **Portal UI (port 8000)** and **Agent API (port 8001)** are internal services behind Nginx
-- Each API request spawns a `claude -p` subprocess (headless mode)
-- **Claude Code** maintains conversation context via session UUIDs (stored in `~/.claude/`)
-- Multiple conversations can run simultaneously (each gets its own UUID)
+- **Nginx** - Routes requests to backend services
+- **Portal UI** - Static HTML/JS chat interface
+- **Agent API** - FastAPI backend that:
+  - Authenticates requests (HTTP Basic Auth)
+  - Spawns Claude CLI: `claude -p "..." --resume {session_id} --output-format json`
+  - For async: redirects stdout to `/tmp/claude_task_{task_id}.json`
+  - For sync: blocks on `subprocess.run()`
+- **Claude CLI** - Runs in project directory, maintains session state in `~/.claude/`
 
-## Features
+**Async Pattern Details:**
+1. `POST /api/sessions/{id}/chat` → `subprocess.Popen()` with `stdout=/tmp/file`
+2. Returns task_id immediately
+3. Browser polls `GET /tasks/{task_id}` → reads file, checks if complete
+4. When done, browser calls `DELETE /tasks/{task_id}` → removes temp file
 
-- **Remote Access**: Chat with Claude Code from any mobile browser
-- **Multiple Sessions**: Dropdown to select and switch between conversations
-- **Session Persistence**: Each conversation maintains full context across requests
-- **Last Message Preview**: See the last message from each conversation
-- **Secure Access**: HTTP Basic Authentication + HTTPS via Cloudflare Tunnel
-- **Mobile-Responsive UI**: Clean chat interface optimized for mobile devices
-- **Cost Tracking**: Monitor API usage and conversation turns per session
-- **Auto-Approved Permissions**: Pre-configured to allow file editing and git operations
-
-## Prerequisites
-
-- Python 3.8 or higher
-- **Nginx** - Reverse proxy for routing requests
-- Claude Code CLI installed (`npm install -g @anthropic-ai/claude-code`)
-- **Claude CLI authenticated** - Run `claude login` in your terminal before starting
-- Cloudflare account (free tier works great)
-- **For persistent access**: A domain managed by Cloudflare (see options below)
-- **For quick testing**: No domain needed - use TryCloudflare
+No subprocess tracking needed - files persist in `/tmp`, OS handles process lifecycle.
 
 ## Installation
 
-Choose between Docker (recommended) or local Python installation:
+### Prerequisites
 
-### Docker Installation (Recommended)
+- Python 3.8+
+- Nginx: `brew install nginx` (macOS) or `apt install nginx` (Linux)
+- Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
+- Cloudflared: `brew install cloudflared` or download from https://github.com/cloudflare/cloudflared/releases
 
-**Advantages:**
-- ✅ Consistent environment across all operating systems (Linux, macOS, Windows)
-- ✅ No Python version conflicts
-- ✅ Claude Code CLI installed automatically in container
-- ✅ Fully portable - only one configurable mount (sessions)
-- ✅ Sessions stored on host for easy backup/migration
-- ✅ Minimal coupling to host filesystem
-
-**Requirements:**
-- Docker and Docker Compose installed
-- Claude CLI authenticated - run `claude login` on your host machine first
-- Cloudflared installed on HOST (for tunnel)
-
-**Quick Start:**
+### Setup
 
 ```bash
-# Authenticate with Claude (REQUIRED FIRST)
+# 1. Authenticate Claude CLI (required)
 claude login
 
-# Clone the repository
+# 2. Clone repository
 git clone https://github.com/rgasiorek/agent-remote-access.git
 cd agent-remote-access
 
-# Configure environment
-cp .env.example .env
-# Edit .env and set:
-#   - AUTH_USERNAME and AUTH_PASSWORD (for web access)
-
-# Build and run with Docker Compose
-docker compose up -d
-
-# Check logs
-docker compose logs -f
-```
-
-The FastAPI server will be running in Docker on port 8000. The container is fully self-contained with no host mounts except a named volume for sessions.
-
-Continue to "Exposing via Cloudflare Tunnel" section below.
-
-### Local Python Installation
-
-### 1. Clone and Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/rgasiorek/agent-remote-access.git
-cd agent-remote-access
-
-# Create virtual environment
+# 3. Install Python dependencies
 python3 -m venv venv
-
-# Activate virtual environment
-. venv/bin/activate
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
-```
 
-### 2. Install Nginx
-
-```bash
-# macOS (with Homebrew)
-brew install nginx
-
-# Ubuntu/Debian
-sudo apt-get install nginx
-
-# CentOS/RHEL
-sudo yum install nginx
-```
-
-### 3. Install Cloudflare Tunnel
-
-```bash
-# macOS (with Homebrew)
-brew install cloudflared
-
-# Or download directly for macOS (ARM64)
-curl -Lo cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64
-chmod +x cloudflared
-sudo mv cloudflared /usr/local/bin/
-
-# For other platforms, visit: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
-```
-
-**Setup Cloudflare Tunnel:**
-
-1. Sign up for free at https://dash.cloudflare.com/sign-up
-2. Authenticate cloudflared:
-
-```bash
-cloudflared tunnel login
-```
-
-This opens a browser window to authorize. Once authorized, create your tunnel:
-
-```bash
-# Create tunnel
-cloudflared tunnel create agent-remote-access
-
-# This creates a credentials file at ~/.cloudflared/<TUNNEL-ID>.json
-# Note the Tunnel ID from the output
-```
-
-3. Create a DNS record (replace with your domain):
-
-```bash
-# Route your domain to the tunnel
-cloudflared tunnel route dns agent-remote-access remote-agent.yourdomain.com
-```
-
-Or use Cloudflare's free subdomain:
-```bash
-cloudflared tunnel route dns agent-remote-access <TUNNEL-ID>.cfargotunnel.com
-```
-
-### 4. Authenticate with Claude CLI
-
-**IMPORTANT:** You must authenticate with Claude Code CLI before starting the servers.
-
-```bash
-# Run this once to authenticate (opens browser)
-claude login
-```
-
-This creates `~/.claude.json` with your authentication credentials. The agent-remote-access system will use this session for all Claude API calls.
-
-### 5. Configure Environment
-
-```bash
-# Copy environment template
+# 4. Configure environment
 cp .env.example .env
-
-# Edit .env and set:
-# - AUTH_USERNAME: Your chosen username
-# - AUTH_PASSWORD: Your secure password
-# - CLAUDE_PROJECT_PATH: Path to the project you want Claude to work in (optional)
+# Edit .env:
+#   AUTH_USERNAME=your_username
+#   AUTH_PASSWORD=your_secure_password
+#   CLAUDE_PROJECT_PATH=/path/to/your/project
 ```
 
-Example `.env`:
-```bash
-AUTH_USERNAME=myusername
-AUTH_PASSWORD=supersecurepassword123
-CLAUDE_PROJECT_PATH=/Users/you/my-project
-HOST=127.0.0.1
-PORT=8000
-```
-
-**Note:** You do NOT need to set `ANTHROPIC_API_KEY` in `.env` - the system uses your `claude login` session.
-
-## Usage
-
-### Starting the Server
-
-#### With Docker (Recommended)
+### Run Locally
 
 ```bash
-# Start the containerized server
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop the server
-docker-compose down
-
-# Rebuild after code changes
-docker-compose up -d --build
-```
-
-The server will be accessible on `http://localhost:8000` (from host)
-
-#### Without Docker (Local Python)
-
-```bash
-# Start application services
+# Start application services only (Portal UI + Agent API)
 ./start.sh
 
-# In another terminal, start Nginx (infrastructure)
-nginx -c $(pwd)/nginx.conf -p $(pwd)
-
-# Or start everything together
+# Start everything (app + Nginx + Cloudflare tunnel)
 ./start_all.sh
+
+# Stop
+./stop.sh        # Apps only
+./stop_all.sh    # Everything
 ```
 
-The application services:
-- Portal UI (port 8000)
-- Agent API (port 8001)
+**Ports:**
+- Portal UI: 8000 (internal)
+- Agent API: 8001 (internal)
+- Nginx: 80 (public, routes to above)
 
-With Nginx running (port 80), access at: `http://localhost`
+### Expose via Cloudflare
 
-To stop:
+**Option 1: Quick testing (URL changes on restart)**
 ```bash
-./stop.sh        # Stop application services
-./stop_all.sh    # Stop everything including Nginx
-```
-
-### Exposing via Cloudflare Tunnel
-
-You have two options for exposing your local server:
-
-#### Option 1: Quick Testing with TryCloudflare (No Domain Required)
-
-**Perfect for:** Testing, development, temporary access
-
-```bash
-# Start a quick tunnel - gives you a random URL instantly
 cloudflared tunnel --url http://localhost
+# Output: https://random-words.trycloudflare.com
 ```
 
-This will output something like:
-```
-https://random-words-here-something.trycloudflare.com
-```
+**Option 2: Persistent domain (requires Cloudflare account + domain)**
 
-**Pros:**
-- No domain required
-- Works immediately
-- Free and simple
-
-**Cons:**
-- URL changes every time you restart
-- No uptime guarantee (testing only)
-- Not suitable for production
-
-#### Option 2: Persistent Named Tunnel (Requires Domain)
-
-**Perfect for:** Production use, consistent URLs, long-term access
-
-In a new terminal:
-
+1. Create tunnel:
 ```bash
-# Run your named tunnel (requires Terraform setup - see below)
-cloudflared tunnel --config .cloudflared/config.yml run agent-remote-access
+cloudflared tunnel login
+cloudflared tunnel create agent-remote-access
 ```
 
-Or use a config file at `~/.cloudflared/config.yml`:
+2. Configure DNS (in Cloudflare dashboard):
+```
+CNAME: remote-agent.yourdomain.com → <tunnel-id>.cfargotunnel.com
+```
 
+3. Create `~/.cloudflared/config.yml`:
 ```yaml
 tunnel: agent-remote-access
-credentials-file: /Users/yourname/.cloudflared/<TUNNEL-ID>.json
+credentials-file: /path/to/.cloudflared/<tunnel-id>.json
 
 ingress:
   - hostname: remote-agent.yourdomain.com
-    service: http://localhost
+    service: http://localhost:80
   - service: http_status:404
 ```
 
-Then simply run:
+4. Run tunnel:
 ```bash
 cloudflared tunnel run
 ```
 
-Your tunnel will be available at: `https://remote-agent.yourdomain.com`
-
-### Accessing from Mobile
-
-1. Open your Cloudflare Tunnel URL in your mobile browser (e.g., `https://remote-agent.yourdomain.com`)
-2. Enter your HTTP Basic Auth credentials (from `.env`)
-3. Select a session from the dropdown or start a new one
-4. Start chatting with Claude Code!
-
-## Domain Options for Persistent Tunnels
-
-**IMPORTANT:** Named Cloudflare Tunnels require a domain. The `.cfargotunnel.com` subdomain is NOT publicly accessible.
-
-### Option A: Buy a Domain (Recommended for Production)
-
-1. **Register a cheap domain** ($1-10/year):
-   - Cloudflare Registrar (cheapest, built-in)
-   - Namecheap, Porkbun, etc.
-
-2. **Add domain to Cloudflare**:
-   - Add site in Cloudflare dashboard
-   - Update nameservers at your registrar
-   - Wait for DNS propagation (~5-60 minutes)
-
-3. **Use Terraform to automate setup**:
-   ```bash
-   cd terraform
-   cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars with your Cloudflare credentials and domain
-   terraform init
-   terraform apply
-   ```
-
-This automatically creates:
-- Cloudflare Tunnel
-- DNS CNAME record pointing to your tunnel
-- Local credentials and config files
-
-See [`terraform/README.md`](terraform/README.md) for detailed instructions.
-
-### Option B: Free Subdomain Services
-
-Use a free DNS provider and manually create CNAME records:
-
-**Popular Free Options:**
-- **Duck DNS** (duckdns.org) - Simple, reliable
-- **FreeDNS** (freedns.afraid.org) - Many TLDs available
-- **No-IP** (noip.com) - Free tier available
-
-**Setup Steps:**
-1. Create free subdomain (e.g., `myproject.duckdns.org`)
-2. Create CNAME record: `<TUNNEL-ID>.cfargotunnel.com`
-3. Update your tunnel config with the subdomain
-4. Run `cloudflared tunnel run agent-remote-access`
+Or use `start_all.sh` which handles tunnel automatically.
 
 ## Project Structure
 
 ```
 agent-remote-access/
-├── server/
-│   ├── main.py              # FastAPI application and routes
-│   ├── auth.py              # HTTP Basic Authentication
-│   ├── session_manager.py   # Session persistence logic
+├── agent-api/
+│   ├── main.py              # FastAPI app, REST endpoints
+│   ├── auth.py              # HTTP Basic Auth
 │   ├── claude_wrapper.py    # Claude CLI wrapper
-│   └── config.py            # Configuration management
-├── frontend/
-│   ├── index.html           # Chat UI
-│   ├── app.js              # Frontend JavaScript
-│   └── styles.css          # Styling
-├── sessions/
-│   └── sessions.json        # Session storage (auto-created)
-├── terraform/               # Cloudflare Tunnel IaC
-│   ├── cloudflare.tf        # Main Terraform config
-│   ├── variables.tf         # Input variables
-│   ├── outputs.tf           # Output values
-│   └── README.md           # Terraform documentation
-├── requirements.txt         # Python dependencies
-├── .env.example            # Environment template
-├── .env                    # Your credentials (gitignored)
-└── README.md               # This file
+│   └── config.py            # Environment config
+├── portal-ui/
+│   ├── main.py              # Static file server
+│   └── static/
+│       ├── index.html       # Chat UI
+│       ├── app.js           # Frontend (polling logic)
+│       └── styles.css
+├── nginx.conf               # Reverse proxy config
+├── start.sh                 # Start apps
+├── start_all.sh             # Start apps + Nginx + tunnel
+├── stop.sh / stop_all.sh
+├── requirements.txt
+├── .env.example
+└── README.md
 ```
 
-## API Endpoints
+## Features
 
-### Public Endpoints
-
-- `GET /health` - Health check (no auth required)
-- `GET /` - Chat UI
-
-### Protected Endpoints (require Basic Auth)
-
-#### Async Chat API (Recommended - bypasses Cloudflare timeout)
-
-The async API uses a polling pattern to work around Cloudflare's ~100s timeout limitation on free tier tunnels. This allows Claude tasks to run indefinitely without HTTP 524 errors.
-
-**Flow:**
-1. Submit task → get `task_id` immediately (< 1s)
-2. Poll status endpoint every 5 seconds
-3. When complete, retrieve result and cleanup
-
-**Endpoints:**
-
-- `POST /api/sessions/{session_id}/chat` - Submit async chat task
-  - Path: `session_id` - Session UUID to resume, or `"new"` for new session
-  - Request: `{"message": "string"}`
-  - Response: `{"task_id": "uuid", "status": "processing"}`
-  - Returns immediately, starts Claude CLI in background
-
-- `GET /api/sessions/{session_id}/tasks/{task_id}` - Poll task status
-  - Path: `session_id` - Session UUID, `task_id` - Task UUID from submit
-  - Response (processing): `{"status": "processing"}`
-  - Response (completed): `{"status": "completed", "result": {...}}`
-  - Response (not found): `{"status": "not_found"}`
-  - Poll every 5s until status is "completed"
-
-- `DELETE /api/sessions/{session_id}/tasks/{task_id}` - Cleanup task
-  - Path: `session_id` - Session UUID, `task_id` - Task UUID
-  - Response: `{"status": "cleaned"}` or `{"status": "not_found"}`
-  - Call after displaying result to user to delete temp file
-
-**Example Flow:**
-```javascript
-// 1. Submit task
-const submit = await fetch('/api/sessions/new/chat', {
-  method: 'POST',
-  body: JSON.stringify({message: 'Help me debug this'})
-});
-const {task_id} = await submit.json();
-
-// 2. Poll every 5s
-const poll = setInterval(async () => {
-  const status = await fetch(`/api/sessions/new/tasks/${task_id}`);
-  const data = await status.json();
-
-  if (data.status === 'completed') {
-    clearInterval(poll);
-    console.log('Result:', data.result);
-
-    // 3. Cleanup
-    await fetch(`/api/sessions/new/tasks/${task_id}`, {method: 'DELETE'});
-  }
-}, 5000);
-```
-
-**Why This Works:**
-- Cloudflare free tier times out HTTP requests after ~100s
-- Each poll completes in < 1s (well under timeout)
-- Tasks can run for hours without 524 errors
-- Simple file-based state in `/tmp` (no subprocess management)
-
-#### Synchronous Chat API (Legacy)
-
-**⚠️ Warning:** Synchronous endpoints will timeout after ~100s when accessed via Cloudflare tunnel. Use async API for long-running tasks.
-
-- `POST /api/chat` - Send message to Claude (blocks until complete)
-  - Request: `{"message": "string", "session_id": "optional-uuid"}`
-  - Response: `{"response": "string", "session_id": "uuid", "cost": float, "turns": int, "success": bool, "error": "string"}`
-  - Only suitable for quick tasks (< 60s)
-
-#### Session Management
-
-- `GET /api/sessions` - List available Claude Code sessions
-  - Response: `{"sessions": [{"session_id": "uuid", "display": "...", "project": "...", "timestamp": 0}]}`
-  - Shows sessions from current project only (filtered by `CLAUDE_PROJECT_PATH`)
-
-- `GET /api/config` - Get configuration
-  - Response: `{"project_path": "/path/to/project"}`
-  - No auth required
-
-## How It Works
-
-1. User sends message from mobile browser
-2. Browser authenticates with HTTP Basic Auth
-3. FastAPI server receives the request
-4. Server checks for existing session ID
-5. Executes `claude -p "message" --resume <session-id> --output-format json`
-6. Parses JSON response from Claude CLI
-7. Saves session ID for next request
-8. Returns response to mobile browser
-
-## Session Management
-
-Sessions are stored in `sessions/sessions.json`:
-
-```json
-{
-  "conversations": {
-    "default": {
-      "session_id": "550e8400-e29b-41d4-a716-446655440000",
-      "created_at": "2025-12-07T10:30:00Z",
-      "last_message_at": "2025-12-07T10:35:00Z",
-      "turn_count": 5
-    }
-  }
-}
-```
-
-Each conversation maintains:
-- Session UUID (used for `claude --resume`)
-- Creation timestamp
-- Last message timestamp
-- Turn count
-
-## Security Considerations
-
-**Implemented:**
-- HTTP Basic Authentication
-- HTTPS via ngrok
-- Credentials stored in `.env` (gitignored)
-- Session IDs are UUIDs (not guessable)
-
-**Limitations:**
-- Basic Auth credentials sent with each request (over HTTPS)
-- Ngrok free tier has URL changes on restart
-- No rate limiting implemented
-- Session file is plaintext on disk
-
-**Production Recommendations:**
-- Use JWT tokens instead of Basic Auth
-- Implement rate limiting
-- Use proper SSL certificates (not ngrok)
-- Encrypt session data at rest
-- Add IP whitelisting
+- **Remote Access** - Chat with Claude from any mobile browser
+- **Async Tasks** - Bypass Cloudflare timeout, tasks run indefinitely
+- **Session Persistence** - Resume conversations across requests
+- **Multiple Sessions** - Dropdown to switch between conversations
+- **Secure** - HTTPS via Cloudflare + HTTP Basic Auth
+- **Mobile-Responsive** - Clean chat interface for mobile
+- **Cost Tracking** - Monitor API usage per session
 
 ## Troubleshooting
 
-### "AUTH_USERNAME and AUTH_PASSWORD must be set"
-- Copy `.env.example` to `.env` and configure credentials
-
 ### "claude: command not found"
-- Install Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
-- Run `claude --version` to verify
+```bash
+npm install -g @anthropic-ai/claude-code
+claude --version
+```
 
-### "Invalid API key" or authentication errors
-- Run `claude login` in your terminal to authenticate
-- The system will automatically use the session from `~/.claude.json`
-- Do NOT set `ANTHROPIC_API_KEY` in `.env` - it will override your login session
-- Check authentication status: `claude auth status`
+### "Not authenticated" error
+```bash
+claude login
+# Creates ~/.claude.json with credentials
+```
 
-### Authentication prompt keeps appearing
-- Verify credentials in `.env` match what you're entering
-- Check for typos in username/password
+### "AUTH_USERNAME must be set"
+```bash
+cp .env.example .env
+# Edit .env and set credentials
+```
 
-### Session not persisting
-- Check `sessions/` directory exists and is writable
-- Look for errors in server logs
+### Cloudflare 524 timeout
+Use async API instead of sync. Async polling bypasses timeout.
 
-### Long response times
-- Claude Code can take time for complex requests
-- Default timeout is 5 minutes (configurable in `claude_wrapper.py`)
+### Session dropdown empty
+Sessions are created after first message. Use "new" session initially.
+
+### Nginx won't start
+```bash
+# Check if port 80 is already in use
+lsof -i :80
+# Kill existing process or change nginx.conf port
+```
+
+### Task not found
+Temp files in `/tmp` may be deleted by OS. Submit a new task.
+
+## Security Notes
+
+**Current implementation:**
+- HTTP Basic Auth (credentials in every request header)
+- HTTPS via Cloudflare Tunnel
+- `.env` credentials (gitignored)
+- Session UUIDs (not guessable)
+
+**For production:**
+- Replace Basic Auth with JWT tokens
+- Implement rate limiting
+- Add IP whitelisting
+- Encrypt session data at rest
 
 ## Development
 
-### Running Locally
+### Testing API Locally
 
 ```bash
-# Terminal 1: Start server
-. venv/bin/activate
-python -m server.main
+# Health check
+curl http://localhost:8001/health
 
-# Terminal 2 (optional): Start ngrok
-ngrok http 8000
+# Submit async task
+curl -u user:pass http://localhost:8001/api/sessions/new/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello Claude"}'
 
-# Access at: http://localhost:8000
+# Poll status
+curl -u user:pass http://localhost:8001/api/sessions/new/tasks/{task_id}
+
+# Cleanup
+curl -u user:pass -X DELETE http://localhost:8001/api/sessions/new/tasks/{task_id}
 ```
 
-### Testing Authentication
+### Running Tests
 
 ```bash
-# Test without auth (should fail)
-curl http://localhost:8000/api/chat
+# Unit tests
+pytest tests/ -v
 
-# Test with auth
-curl -u username:password http://localhost:8000/api/chat \\
-  -H "Content-Type: application/json" \\
-  -d '{"message": "Hello Claude!"}'
+# With coverage
+pytest tests/ --cov=agent-api --cov-report=term-missing
 ```
-
-### Viewing Sessions
-
-```bash
-# Via API
-curl -u username:password http://localhost:8000/api/sessions
-
-# Via file
-cat sessions/sessions.json
-```
-
-## Troubleshooting
-
-### Cloudflare Tunnel Connection Issues
-
-If you see "control stream encountered a failure" errors:
-
-1. **Verify FastAPI server is running:**
-   ```bash
-   curl http://localhost:8000/health
-   # Should return: {"status":"healthy","service":"claude-remote-access"}
-   ```
-
-2. **Check cloudflared is using correct config:**
-   ```bash
-   # When using Terraform-generated config, run:
-   cloudflared tunnel --config .cloudflared/config.yml run agent-remote-access
-   ```
-
-3. **Validate ingress configuration:**
-   ```bash
-   cloudflared tunnel --config .cloudflared/config.yml ingress validate
-   # Should output: OK
-   ```
-
-4. **Check tunnel status:**
-   ```bash
-   # View tunnel info (requires API token in env)
-   export CLOUDFLARE_API_TOKEN=your_token
-   cloudflared tunnel info agent-remote-access
-   ```
-
-5. **Verify credentials file exists:**
-   ```bash
-   ls -la .cloudflared/*.json
-   # Should show the tunnel credentials file
-   ```
-
-6. **Test local connectivity:**
-   ```bash
-   # Ensure no firewall blocking localhost:8000
-   telnet localhost 8000
-   # Or:
-   nc -zv localhost 8000
-   ```
-
-7. **Check for port conflicts:**
-   ```bash
-   lsof -i :8000
-   # Should only show your python process
-   ```
-
-### Common Issues
-
-**"Could not resolve host: *.cfargotunnel.com" or tunnel URL not accessible**
-- **Problem**: Named tunnels do NOT get public DNS automatically
-- **Solution**: You MUST either:
-  1. Use TryCloudflare for quick testing: `cloudflared tunnel --url http://localhost:8000`
-  2. Add a domain to your Cloudflare account and configure DNS records
-  3. Use a free subdomain service (Duck DNS, FreeDNS)
-- The `.cfargotunnel.com` subdomain exists but is NOT publicly routable
-- See "Domain Options for Persistent Tunnels" section above
-
-**"Cannot determine default origin certificate path"**
-- Solution: Always specify `--config` flag with full path to config.yml
-- Example: `cloudflared tunnel --config /full/path/to/.cloudflared/config.yml run agent-remote-access`
-
-**"Tunnel not found" or "404" on URL**
-- Ensure tunnel is running (`ps aux | grep cloudflared`)
-- Verify you're using the correct tunnel URL from Terraform output
-- Check tunnel exists: `cloudflared tunnel list`
-
-**"Authentication error (10000)"**
-- Your Cloudflare API token needs **Cloudflare Tunnel** permissions
-- Regenerate token at: https://dash.cloudflare.com/profile/api-tokens
-- Update `terraform/terraform.tfvars` with new token
-
-**Remote Claude can't edit files**
-- Add permissions to `.claude/settings.local.json` (see QUICKSTART.md)
-- Start a new Claude session after updating permissions
-- Old sessions don't pick up new permission settings
-
-**Session dropdown empty**
-- Sessions are created after first message
-- Check `sessions/sessions.json` exists and is valid JSON
-- Restart FastAPI server if file was manually edited
-
-## Future Enhancements
-
-- [ ] JWT authentication
-- [ ] Rate limiting per user
-- [ ] Multiple project switching
-- [ ] WebSocket support for streaming responses
-- [ ] Conversation history export
-- [ ] Mobile app (native)
-- [ ] Session encryption
-- [ ] Multi-user support
-
-## License
-
-MIT License - feel free to modify and use as needed.
-
-## Support
-
-For issues with:
-- Claude Code CLI: https://github.com/anthropics/claude-code/issues
-- This project: Open an issue in this repository
 
 ## Notes
 
-- This uses Claude Code's headless mode (`-p`), spawning a new process per request
-- Session state is managed by Claude Code itself (stored in `~/.claude/`)
-- This server only tracks which session UUID to resume
-- Project context is determined by `CLAUDE_PROJECT_PATH` environment variable
-- Each request is independent - long-running tasks may timeout
+- Each request spawns a new `claude -p` subprocess
+- Session state managed by Claude Code in `~/.claude/`
+- Project context from `CLAUDE_PROJECT_PATH` environment variable
+- Temp files in `/tmp` cleaned up by browser after rendering
+- Orphaned processes handled by OS (no manual cleanup needed)
 
-## Credits
+## License
 
-Built to enable remote access to Claude Code CLI sessions from mobile devices.
+MIT License - modify and use freely.
+
+## Support
+
+- Claude Code CLI: https://github.com/anthropics/claude-code/issues
+- This project: Open an issue in this repository
