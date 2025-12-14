@@ -4,23 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI Local Agent - Remote Access</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
     <div class="container">
         <header>
             <div class="header-title">
-                <div class="logo">▶</div>
+                <div class="prompt">root@ai-agent:~$</div>
                 <div class="title-text">
                     <h1>AI Local Agent</h1>
-                    <span class="subtitle">Remote Access</span>
+                    <span class="subtitle">Remote Terminal Access</span>
                 </div>
             </div>
             <div class="header-info">
-                <span id="session-info" class="info-badge">No active session</span>
+                <span id="session-info" class="info-badge">● no session</span>
                 <div class="stats">
-                    <span>Turns: <strong id="turn-count">0</strong></span>
-                    <span>Cost: <strong id="total-cost">$0.0000</strong></span>
+                    <span>turns=<strong id="turn-count">0</strong></span>
+                    <span>cost=<strong id="total-cost">$0.0000</strong></span>
                 </div>
             </div>
         </header>
@@ -53,6 +53,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script src="/app.js"></script>
 </body>
 </html>

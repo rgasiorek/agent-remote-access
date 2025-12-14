@@ -220,10 +220,10 @@ function updateStats() {
 
 function updateSessionInfo() {
     if (sessionId) {
-        sessionInfo.textContent = `Session: ${sessionId.substring(0, 8)}...`;
+        sessionInfo.textContent = `● ${sessionId.substring(0, 8)}`;
         sessionInfo.className = 'info-badge active';
     } else {
-        sessionInfo.textContent = 'No active session';
+        sessionInfo.textContent = '● no session';
         sessionInfo.className = 'info-badge';
     }
 }
