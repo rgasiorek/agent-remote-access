@@ -59,6 +59,8 @@ async function loadConfig() {
             if (headerPrompt && projectPath) {
                 const username = getCurrentUsername();
                 headerPrompt.textContent = `${username}@agent:${projectPath}$`;
+            } else if (headerPrompt) {
+                headerPrompt.textContent = 'Error: No project path';
             }
 
             if (projectInfoEl) {
@@ -70,9 +72,16 @@ async function loadConfig() {
                     projectInfoEl.style.display = 'none';
                 }
             }
+        } else {
+            if (headerPrompt) {
+                headerPrompt.textContent = 'Error: Failed to load config';
+            }
         }
     } catch (error) {
         console.error('Failed to load config:', error);
+        if (headerPrompt) {
+            headerPrompt.textContent = 'Error: Config load failed';
+        }
     }
 }
 

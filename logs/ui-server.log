@@ -1,4 +1,4 @@
-INFO:     Started server process [8219]
+INFO:     Started server process [20312]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
@@ -6,26 +6,7 @@ Starting UI Server...
 Server URL: http://127.0.0.1:8000
 Agent API URL: http://127.0.0.1:8001
 
-INFO:     127.0.0.1:54532 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54532 - "GET /static/styles.css HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54533 - "GET /static/app.js HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54532 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54533 - "GET /static/styles.css HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54532 - "GET /static/app.js HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54533 - "GET /static/styles.css HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54532 - "GET /static/app.js HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54533 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54532 - "GET /static/styles.css HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54533 - "GET /static/app.js HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54594 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54594 - "GET /static/styles.css HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54595 - "GET /static/app.js HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54594 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54595 - "GET /static/styles.css HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54594 - "GET /static/app.js HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54595 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54594 - "GET /static/styles.css HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54595 - "GET /static/app.js HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54606 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54619 - "HEAD /static/styles.css HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:54695 - "GET /styles.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57606 - "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57607 - "GET /apple-touch-icon.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57608 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57672 - "GET / HTTP/1.1" 200 OK

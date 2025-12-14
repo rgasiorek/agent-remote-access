@@ -1,4 +1,10 @@
-INFO:     Started server process [8187]
+INFO:     Started server process [20280]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+Starting Agent API Server...
+Project path: /Users/montrosesoftware/Workspace/agent-remote-access
+Server URL: http://127.0.0.1:8001
+Authentication: rgasiorek / **************
+
+INFO:     127.0.0.1:57604 - "GET /api/sessions HTTP/1.1" 200 OK
