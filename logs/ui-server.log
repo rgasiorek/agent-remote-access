@@ -1,16 +1,20 @@
-INFO:     Started server process [52260]
+INFO:     Started server process [61244]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
 Starting UI Server...
 Server URL: http://127.0.0.1:8000
 Agent API URL: http://127.0.0.1:8001
 
-INFO:     80.1.230.146:0 - "GET / HTTP/1.1" 200 OK
-INFO:     80.1.230.146:0 - "GET /styles.css HTTP/1.1" 200 OK
-INFO:     80.1.230.146:0 - "GET /app.js HTTP/1.1" 200 OK
-INFO:     80.1.230.146:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [52260]
+INFO:     127.0.0.1:53858 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53858 - "GET /styles.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53859 - "GET /app.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53862 - "GET /favicon.ico HTTP/1.1" 404 Not Found

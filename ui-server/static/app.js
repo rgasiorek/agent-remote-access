@@ -217,10 +217,13 @@ function updateSessionInfo() {
 function setInputState(enabled, buttonText = null) {
     messageInput.disabled = !enabled;
     sendBtn.disabled = !enabled;
+
     if (buttonText) {
-        sendBtn.textContent = buttonText;
+        sendBtn.innerHTML = `<span class="btn-icon">→</span><span class="btn-text">${buttonText}</span>`;
     } else {
-        sendBtn.textContent = enabled ? 'Send' : 'Sending...';
+        const text = enabled ? 'Send' : 'Sending...';
+        const icon = enabled ? '→' : '⋯';
+        sendBtn.innerHTML = `<span class="btn-icon">${icon}</span><span class="btn-text">${text}</span>`;
     }
 }
 
