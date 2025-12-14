@@ -161,20 +161,44 @@ async function sendMessage() {
     // Clear input
     messageInput.value = '';
 
-    // Show AI thinking status immediately - HTTP is fast, waiting for Claude is slow
+    // Show AI thinking status immediately
     const statusMsg = addStatusMessage('AI is thinking...');
     setInputState(false, 'AI is thinking...');
 
+    // Track elapsed time and update status message
+    const startTime = Date.now();
+    let warningShown = false;
+
+    const timeoutWarning = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+        if (elapsed >= 60 && !warningShown) {
+            updateStatusMessage(statusMsg, '⏳ Complex task detected, this may take several minutes...', 'info');
+            warningShown = true;
+        } else if (elapsed < 60) {
+            updateStatusMessage(statusMsg, `AI is thinking... (${elapsed}s)`, 'info');
+        } else {
+            updateStatusMessage(statusMsg, `⏳ Still processing... (${elapsed}s)`, 'info');
+        }
+    }, 2000); // Update every 2 seconds
+
     try {
-        // Send to Agent API - this completes quickly, but waits for full Claude response
+        // Send to Agent API with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 610000); // 10 minutes + 10 seconds
+
         const response = await fetch(`${AGENT_API_URL}/api/chat`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
                 message: message,
                 session_id: sessionId
-            })
+            }),
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
+        clearInterval(timeoutWarning);
 
         if (response.status === 401) {
             // Auth failed - clear credentials and retry
@@ -183,6 +207,10 @@ async function sendMessage() {
             alert('Authentication failed. Please enter your credentials again.');
             window.location.reload();
             return;
+        }
+
+        if (response.status === 524) {
+            throw new Error('Request timed out. The AI task is taking too long. Try breaking it into smaller requests or check your Cloudflare tunnel timeout settings.');
         }
 
         if (!response.ok) {
@@ -220,11 +248,20 @@ async function sendMessage() {
         }
 
     } catch (error) {
+        clearInterval(timeoutWarning);
         console.error('Error sending message:', error);
-        updateStatusMessage(statusMsg, '✗ Failed to send message', 'error');
-        addMessage('error', `Failed to send message: ${error.message}`);
-        setTimeout(() => removeStatusMessage(statusMsg), 3000);
+
+        if (error.name === 'AbortError') {
+            updateStatusMessage(statusMsg, '✗ Request timed out after 10 minutes', 'error');
+            addMessage('error', 'Request timed out after 10 minutes. Try breaking your task into smaller requests.');
+        } else {
+            updateStatusMessage(statusMsg, '✗ Failed to send message', 'error');
+            addMessage('error', `Failed to send message: ${error.message}`);
+        }
+
+        setTimeout(() => removeStatusMessage(statusMsg), 5000);
     } finally {
+        clearInterval(timeoutWarning);
         setInputState(true, 'Send');
         updateSendButtonState();
         if (!sendBtn.disabled) {

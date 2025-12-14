@@ -19,13 +19,13 @@ class ClaudeWrapper:
     Uses headless mode (claude -p) with JSON output
     """
 
-    def __init__(self, project_path: str = None, timeout: int = 300):
+    def __init__(self, project_path: str = None, timeout: int = 600):
         """
         Initialize Claude wrapper
 
         Args:
             project_path: Working directory for Claude context
-            timeout: Maximum execution time in seconds (default: 5 minutes)
+            timeout: Maximum execution time in seconds (default: 10 minutes)
         """
         self.project_path = project_path or str(Path.cwd())
         self.timeout = timeout

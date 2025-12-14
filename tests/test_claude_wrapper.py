@@ -23,7 +23,7 @@ class TestClaudeWrapper:
         with patch.object(Path, 'exists', return_value=True):
             wrapper = ClaudeWrapper()
             assert wrapper.project_path == '/test/path'
-            assert wrapper.timeout == 300
+            assert wrapper.timeout == 600  # 10 minutes
             assert wrapper.cli_command == 'claude'
 
     @patch('claude_wrapper.Path')
