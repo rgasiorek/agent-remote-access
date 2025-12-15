@@ -106,19 +106,22 @@ if [ "$SKIP_TUNNEL" = false ]; then
         TUNNEL_PID=$!
         echo $TUNNEL_PID > logs/cloudflared.pid
 
-        # Wait for tunnel to start and get URL
+        # Wait for tunnel to start and get URL (retry up to 15 seconds)
         echo "Waiting for tunnel to connect..."
-        sleep 5
-
-        # Extract tunnel URL from logs
-        TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' logs/cloudflared.log | head -1)
+        TUNNEL_URL=""
+        for i in {1..15}; do
+            sleep 1
+            TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' logs/cloudflared.log | head -1)
+            if [ -n "$TUNNEL_URL" ]; then
+                break
+            fi
+        done
 
         if [ -n "$TUNNEL_URL" ]; then
-            echo -e "${GREEN}✓ Cloudflare tunnel started${NC}"
-            echo -e "Tunnel URL: ${GREEN}${TUNNEL_URL}${NC}"
+            echo -e "${GREEN}✓ Cloudflare tunnel connected${NC}"
         else
-            echo -e "${YELLOW}Tunnel started but URL not yet available${NC}"
-            echo "Check logs/cloudflared.log for tunnel URL"
+            echo -e "${YELLOW}⚠ Tunnel URL not captured yet${NC}"
+            echo "  Check logs/cloudflared.log in a few seconds"
         fi
     fi
 fi
@@ -126,9 +129,23 @@ fi
 echo ""
 echo -e "${GREEN}✓ All services started successfully!${NC}"
 echo "======================================="
-echo -e "Local access:  ${GREEN}http://localhost${NC}"
-if [ "$SKIP_TUNNEL" = false ] && [ -n "$TUNNEL_URL" ]; then
-    echo -e "Remote access: ${GREEN}${TUNNEL_URL}${NC}"
+
+# Get local IP address
+LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "")
+
+echo ""
+echo "Access URLs:"
+echo "------------"
+echo -e "  Localhost:      ${GREEN}http://localhost${NC}"
+if [ -n "$LOCAL_IP" ]; then
+    echo -e "  Local Network:  ${GREEN}http://${LOCAL_IP}${NC} (same Wi-Fi devices)"
+fi
+if [ "$SKIP_TUNNEL" = false ]; then
+    if [ -n "$TUNNEL_URL" ]; then
+        echo -e "  Remote (HTTPS): ${GREEN}${TUNNEL_URL}${NC}"
+    else
+        echo -e "  Remote (HTTPS): ${YELLOW}Connecting... (check logs/cloudflared.log)${NC}"
+    fi
 fi
 echo ""
 echo "Services running:"
